@@ -1,5 +1,8 @@
 #!/bin/bash
 
+FILE_EEPROM="eeprom.lua"
+UUID_REPLACE="__DRIVE_UUID_PRIMARY__"
+
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
@@ -34,13 +37,14 @@ do
     do
         printf "Updating drive ${RED}$DRIVE${NC} from template ${GREEN}$1/$ALIAS${NC}...\n"
         DIR_DEST="$DIR_DRIVES/$DRIVE"
-        rm -rf "$DIR_DEST/*"
+        echo $DIR_DEST
+        find . -name \* -delete # rm -rf wasn't working here but this does the job.
         cp -rf "$DIR_TEMPLATE/$ALIAS" "$DIR_DEST"
 
         # If this is a primary drive and eeprom.lua exists, rewrite {DRIVE_UUID_PRIMARY} to the drive's UUID.
         if [ $ALIAS = "primary" ]; then
-            if [ -f "$DIR_DEST/$ALIAS/eeprom.lua" ]; then
-                sed -i s/__DRIVE_UUID_PRIMARY__/$DRIVE/ "$DIR_DEST/$ALIAS/eeprom.lua"
+            if [ -f "$DIR_DEST/$FILE_EEPROM" ]; then
+                sed -i s/$UUID_REPLACE/$DRIVE/ "$DIR_DEST/$FILE_EEPROM"
                 echo "Primary drive UUID set!"
             fi
         fi

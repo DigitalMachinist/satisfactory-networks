@@ -5,7 +5,7 @@ MODE = "DEFAULT"
 DRIVE_UUID_PRIMARY = "54AAEAAC4DDFE3560E8ADE8B9D940DF5"
 
 -- Optional: Any secondary disk connected to the computer.
-DRIVE_UUID_SECONDARY = "1998D54D41BA8071D5C5F7B7C7F0D1AA"
+DRIVE_UUID_SECONDARY = nil
 
 -- Optional: Set this to require that only the floppy matching this UUID will mount.
 -- Use this to protect your computer against an incorrect disk being used to make changes to it.
