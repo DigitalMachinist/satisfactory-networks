@@ -22,10 +22,10 @@ cd "$DIR_TEMPLATE"
 ALIASES="$( find . -mindepth 1 -maxdepth 1 -type d | cut -c3- )"
 for ALIAS in $ALIASES
 do
-    printf "Discovered template ${GREEN}$1/$ALIAS${NC}!\n"
+    printf "Found template ${GREEN}$1/$ALIAS${NC}!\n"
 done
 
-# Copy the templ
+# Copy the template files into the drive folder.
 DIR_DRIVES="$DIR_SCRIPT/../drives"
 cd "$DIR_DRIVES"
 for ALIAS in $ALIASES
@@ -36,10 +36,9 @@ do
     for DRIVE in $DRIVES
     do
         printf "Updating drive ${RED}$DRIVE${NC} from template ${GREEN}$1/$ALIAS${NC}...\n"
+        find "./$DRIVE" -mindepth 1 -name \* -delete # rm -rf wasn't working here but this does the job.
         DIR_DEST="$DIR_DRIVES/$DRIVE"
-        echo $DIR_DEST
-        find . -name \* -delete # rm -rf wasn't working here but this does the job.
-        cp -rf "$DIR_TEMPLATE/$ALIAS" "$DIR_DEST"
+        cp -rf $DIR_TEMPLATE/$ALIAS/* "$DIR_DEST"
 
         # If this is a primary drive and eeprom.lua exists, rewrite {DRIVE_UUID_PRIMARY} to the drive's UUID.
         if [ $ALIAS = "primary" ]; then
@@ -51,5 +50,6 @@ do
     done
 done
 
-# Return to the directory the user started from.
 cd $PWD
+
+echo "Done!"

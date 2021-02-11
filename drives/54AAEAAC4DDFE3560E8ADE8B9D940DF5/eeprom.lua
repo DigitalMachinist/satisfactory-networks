@@ -1,5 +1,5 @@
 -- Required: The main disk to boot from (config, functions, component instructions).
-DRIVE_UUID_PRIMARY = "54AAEAAC4DDFE3560E8ADE8B9D940DF5"
+DRIVE_UUID_PRIMARY = "__DRIVE_UUID_PRIMARY__"
 
 -- Optional: Any secondary disk connected to the computer.
 DRIVE_UUID_SECONDARY = nil
