@@ -1,3 +1,6 @@
 backup
-drives/*
+
+# Ignore drives but leave any tags in each drive.
+!drives/
+drives/*/*
 !drives/*/tags
