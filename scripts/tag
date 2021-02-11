@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+if [ -z "$2" ]; then
+    echo "Missing arguments!"
+    echo "Usage: ./tag <tag> <drive_uuid> [<drive_uuid>]...";
+    exit 1
+fi
+
+for DRIVE in "${@:2}"
+do
+    touch "$SCRIPT_DIR/../drives/$DRIVE/tags/$1" && echo "Tagged drive $DRIVE..."
+done
+
+echo "Done!"

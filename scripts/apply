@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILE_EEPROM="eeprom.lua"
+FILE_BOOT="eeprom.lua"
 UUID_REPLACE="__DRIVE_UUID_PRIMARY__"
 
 GREEN='\033[0;32m'
@@ -13,7 +13,7 @@ DIR_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 if [ -z "$1" ]; then
     echo "Argument 'template' is required!"
-    echo "Usage: ./deploy_template.sh <template>";
+    echo "Usage: ./apply <template>";
     exit 1
 fi
 

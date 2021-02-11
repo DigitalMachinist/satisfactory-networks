@@ -10,7 +10,7 @@ cp -rf "$DEST_DIR" "$SCRIPT_DIR/../backup/$TIMESTAMP"
 
 # Delete the existing computer configuration.
 echo "Cleaning Satisfactory folder..."
-#rm -rf "$DEST_DIR/*"
+rm -rf "$DEST_DIR/*"
 
 # Publish *this* computer configuration into the Satisfactory folder.
 echo "Publishing computers to Satisfactory folder..."

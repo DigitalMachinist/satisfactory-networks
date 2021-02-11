@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+if [ -z "$2" ]; then
+    echo "Missing arguments!"
+    echo "Usage: ./untag <tag> <drive_uuid> [<drive_uuid>]...";
+    exit 1
+fi
+
+for DRIVE in "${@:2}"
+do
+    rm -I "$SCRIPT_DIR/../drives/$DRIVE/tags/$1" >/dev/null 2>&1 && echo "Untagged drive $DRIVE..."
+done
+
+echo "Done!"

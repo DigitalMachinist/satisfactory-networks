@@ -1,8 +1,4 @@
--- The execution mode. Accepts: [DEFAULT]
-MODE = "DEFAULT"
-
 -- Required: The main disk to boot from (config, functions, component instructions).
--- This *can* be a floppy if you want to boot from a floppy.
 DRIVE_UUID_PRIMARY = "54AAEAAC4DDFE3560E8ADE8B9D940DF5"
 
 -- Optional: Any secondary disk connected to the computer.
@@ -16,12 +12,6 @@ DRIVE_UUID_FLOPPY = nil
 DRIVE_ALIAS_PRIMARY = "primary"
 DRIVE_ALIAS_SECONDARY = "secondary"
 DRIVE_ALIAS_FLOPPY = "floppy"
-
--- File paths
-FILE_CONFIG = "config.lua"
-DIR_FUNCTIONS = "functions"
-DIR_COMPONENT = "component"
-FILE_COMPONENT = "component.lua"
 
 -- State
 __Drives = nil
@@ -47,6 +37,15 @@ function MapDrives()
     end
 
     return drives
+end
+
+function InitFilesystem()
+    -- Initialize /dev
+    if fs.initFileSystem("/dev") == false then
+        computer.panic("Unable to initialize the filesystem.")
+    end
+
+    __Drives = MapDrives()
 end
 
 function PrintConnectedDrives()
@@ -93,72 +92,81 @@ function MountSecondary()
     end
 end
 
-function MountAll()
-    -- Initialize /dev
-    if fs.initFileSystem("/dev") == false then
-        computer.panic("Unable to initialize the filesystem.")
-    end
-
-    __Drives = MapDrives()
-    PrintConnectedDrives()
-    print()
-
+function MountAllDrives()
     MountFloppy()
     MountPrimary()
     MountSecondary()
-    print()
 end
 
-function RunConfig(fileConfig)
-    if fs.exists(fileConfig) and fs.isFile(fileConfig) then
-        print(fileConfig.." exists! Attempting to load configuration...")
-        if fs.doFile(fileConfig) == false then
-            print("Unable to run "..fileConfig..". Skipping...")
-        end
+function UpdateEEPROM(filepathEEPROM, tagLock)
+    if fs.exists(tagLock) == false then
+        -- Read in the new EEPROM code from the given filepath.
+        local fileHandle = fs.open(filepathEEPROM, "r")
+        local code = fileHandle:read()
+        fileHandle:close()
+
+        -- Update the computer's EEPROM code to the file contents.
+        computer.setEEPROM(code)
+
+        -- Create the a lockfile to prevent further updates.
+        local tagHandle = fs.open(tagLock, "w")
+        tagHandle:close()
+
+        -- Reboot the computer.
+        computer.reset()
     end
 end
 
--- Load files into Lua as functions
--- TODO: Recursively traverse directory structure.
-function LoadFunctions(dirFunctions)
-    if fs.exists(dirFunctions) and fs.isDir(dirFunctions) then
-        print(dirFunctions.." folder exists! Attempting to load functions...")
-        local nodes = fs.childs(dirFunctions)
-        for i,node in pairs(nodes) do
-            local filepath = dirFunctions.."/"..node
-            if fs.isFile(filepath) then
-                if filepath:sub(-4) == ".lua" then
-                    print("Loading "..filepath.." as a function...")
-                    local filename = node:sub(0, string.len(node) - 4)
-                    _G[filename] = fs.loadFile(filepath)
-                    print(i..". "..filepath.." loaded into global table as "..filename.."()")
+function LoadLibrariesRecursive(dirpath)
+    local nodes = fs.childs(dirpath)
+    for i,node in pairs(nodes) do
+        local path = dirpath.."/"..node
+        if fs.isDir(path) then
+            -- Recursively load subdirectories.
+            LoadLibrariesRecursive(path)
+        else
+            -- Only load *.lua files
+            if path:sub(-4) == ".lua" then
+                if fs.doFile(path) then
+                    print(i..". Unable to execute "..path.."!")
+                else
+                    print(i..". "..path.." executed successfully!")
                 end
             end
         end
     end
 end
 
-function RunComponent(fileComponent)
-    if (fs.exists(fileComponent) and fs.isFile(fileComponent)) == false then
-        computer.panic("Unable to find component instructions at "..fileComponent..".")
+function LoadLibraries(dirpath)
+    if fs.exists(dirpath) and fs.isDir(dirpath) then
+        print(dirpath.." folder exists! Attempting to load libraries...")
+        LoadLibrariesRecursive(dirpath)
+    end
+end
+
+function RunApp(filepath)
+    if (fs.exists(filepath) and fs.isFile(filepath)) == false then
+        computer.panic("Unable to find component instructions at "..filepath..".")
     end
 
-    print("Running component instructions at "..fileComponent.."...")
-    if fs.doFile(fileComponent) == false then
+    print("Running component instructions at "..filepath.."...")
+    if fs.doFile(filepath) == false then
         computer.panic("Unable to run component instructions.")
     end
 end
 
 function ModeDefault()
-    MountAll()
-
-    RunConfig("/"..DRIVE_ALIAS_PRIMARY.."/"..FILE_CONFIG)
+    InitFilesystem()
+    PrintConnectedDrives()
     print()
-    LoadFunctions("/"..DRIVE_ALIAS_PRIMARY.."/"..DIR_FUNCTIONS)
+    MountAllDrives()
     print()
-
-    -- This is the entrypoint to the component instructions.
-    RunComponent("/"..DRIVE_ALIAS_PRIMARY.."/"..DIR_COMPONENT.."/"..FILE_COMPONENT)
+    UpdateEEPROM("/primary/eeprom.lua", "/primary/tags/update_lock")
+    print()
+    LoadLibraries("/primary/libraries")
+    Test()
+    print()
+    RunApp("/primary/app.lua")
 end
 
 function Main()
