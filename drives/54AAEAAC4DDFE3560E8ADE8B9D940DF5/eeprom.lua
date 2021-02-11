@@ -2,6 +2,7 @@
 MODE = "DEFAULT"
 
 -- Required: The main disk to boot from (config, functions, component instructions).
+-- This *can* be a floppy if you want to boot from a floppy.
 DRIVE_UUID_PRIMARY = "54AAEAAC4DDFE3560E8ADE8B9D940DF5"
 
 -- Optional: Any secondary disk connected to the computer.
