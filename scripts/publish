@@ -1,5 +1,6 @@
 #!/bin/bash
 
+PWD="$( pwd )"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DEST_DIR="/mnt/c/Users/jrose/AppData/Local/FactoryGame/Saved/SaveGames/Computers"
 TIMESTAMP=`date +%Y-%m-%d_%H-%M-%S`
@@ -10,10 +11,13 @@ cp -rf "$DEST_DIR" "$SCRIPT_DIR/../backup/$TIMESTAMP"
 
 # Delete the existing computer configuration.
 echo "Cleaning Satisfactory folder..."
-rm -rf "$DEST_DIR/*"
+cd "$DEST_DIR"
+find . -mindepth 1 -name \* -delete # rm -rf wasn't working here but this does the job.
 
-# Publish *this* computer configuration into the Satisfactory folder.
+# Publish the repo drives into the Satisfactory folder.
 echo "Publishing computers to Satisfactory folder..."
-#cp -rf "$SCRIPT_DIR/../computers/*" "$DEST_DIR"
+cp -rf $SCRIPT_DIR/../drives/* "$DEST_DIR"
+
+cd $PWD
 
 echo "Done!"
