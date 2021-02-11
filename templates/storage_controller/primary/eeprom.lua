@@ -13,11 +13,6 @@ DRIVE_ALIAS_PRIMARY = "primary"
 DRIVE_ALIAS_SECONDARY = "secondary"
 DRIVE_ALIAS_FLOPPY = "floppy"
 
--- File paths
-FILE_APP = "app.lua"
-FILE_EEPROM = "eeprom.lua"
-DIR_LIBRARIES = "libraries"
-
 -- State
 __Drives = nil
 fs = filesystem
