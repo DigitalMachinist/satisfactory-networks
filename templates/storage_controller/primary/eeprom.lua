@@ -64,8 +64,6 @@ end
 
 function MountFloppy()
     if __Drives[DRIVE_ALIAS_FLOPPY] ~= nil then
-        print(DRIVE_UUID_FLOPPY)
-        print(__Drives[DRIVE_ALIAS_FLOPPY])
         if DRIVE_UUID_FLOPPY ~= nil and __Drives[DRIVE_ALIAS_FLOPPY] ~= DRIVE_UUID_FLOPPY then
             computer.panic("Inserted floppy "..__Drives[DRIVE_ALIAS_FLOPPY].." does not match expected "..DRIVE_UUID_FLOPPY..".")
         end
@@ -99,22 +97,27 @@ function MountAllDrives()
 end
 
 function UpdateEEPROM(filepathEEPROM, tagLock)
-    if fs.exists(tagLock) == false then
-        -- Read in the new EEPROM code from the given filepath.
-        local fileHandle = fs.open(filepathEEPROM, "r")
-        local code = fileHandle:read()
-        fileHandle:close()
+    print "!! NOTICE !!"
+    print "To update this EEPROM, copy the contents of eeprom.lua into this terminal (ingame)."
+    print "We will be able to do this automatically after next patch with setEEPROM()!"
 
-        -- Update the computer's EEPROM code to the file contents.
-        computer.setEEPROM(code)
+    -- TODO: Reenable the following after next patch!
+    -- if fs.exists(tagLock) == false then
+    --     -- Read in the new EEPROM code from the given filepath.
+    --     local f = assert(fs.open(filepathEEPROM, "r"))
+    --     local content = f:read("*all")
+    --     f:close()
 
-        -- Create the a lockfile to prevent further updates.
-        local tagHandle = fs.open(tagLock, "w")
-        tagHandle:close()
+    --     -- Update the computer's EEPROM code to the file contents.
+    --     computer.setEEPROM(content)
 
-        -- Reboot the computer.
-        computer.reset()
-    end
+    --     -- Create the a lockfile to prevent further updates.
+    --     f = assert(fs.open(tagLock, "w"))
+    --     f:close()
+
+    --     -- Reboot the computer.
+    --     computer.reset()
+    -- end
 end
 
 function LoadLibrariesRecursive(dirpath)
@@ -128,10 +131,12 @@ function LoadLibrariesRecursive(dirpath)
             -- Only load *.lua files
             if path:sub(-4) == ".lua" then
                 if fs.doFile(path) then
-                    print(i..". Unable to execute "..path.."!")
+                    print(i..". "..path.." execution failed.")
                 else
                     print(i..". "..path.." executed successfully!")
                 end
+            else
+                print(i..". "..path.." (non-Lua) skipped...")
             end
         end
     end
@@ -146,16 +151,16 @@ end
 
 function RunApp(filepath)
     if (fs.exists(filepath) and fs.isFile(filepath)) == false then
-        computer.panic("Unable to find component instructions at "..filepath..".")
+        computer.panic("Unable to find app instructions at "..filepath..".")
     end
 
-    print("Running component instructions at "..filepath.."...")
+    print("Running app instructions at "..filepath.."...")
     if fs.doFile(filepath) == false then
-        computer.panic("Unable to run component instructions.")
+        computer.panic("Unable to run app instructions.")
     end
 end
 
-function ModeDefault()
+function Main()
     InitFilesystem()
     PrintConnectedDrives()
     print()
@@ -164,18 +169,8 @@ function ModeDefault()
     UpdateEEPROM("/primary/eeprom.lua", "/primary/tags/update_lock")
     print()
     LoadLibraries("/primary/libraries")
-    Test()
     print()
     RunApp("/primary/app.lua")
-end
-
-function Main()
-    if MODE == 'DEFAULT' then
-        ModeDefault()
-    else
-        computer.panic("Unexpected execution mode ("..MODE..")")
-    end
-
     print()
     print("STOPPED")
 end
