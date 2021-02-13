@@ -13,14 +13,24 @@ DRIVE_ALIAS_PRIMARY = "primary"
 DRIVE_ALIAS_SECONDARY = "secondary"
 DRIVE_ALIAS_FLOPPY = "floppy"
 
+-- Splitter contants.
+SPLITTER_OUTPUT_LEFT = 0
+SPLITTER_OUTPUT_CENTER = 1
+SPLITTER_OUTPUT_RIGHT = 2
+SPLITTER_NUM_OUTPUTS = 3
+
 -- State
 __Drives = nil
 fs = filesystem
 
 -- Functions
 function MapDrives()
-    local drives = {};
-    for _, drive in pairs(fs.childs("/dev")) do
+    local drives = fs.childs("/dev")
+    -- for _, drive in pairs(drives) do
+    --     print(drive)
+    -- end
+    local drivesMap = {};
+    for _, drive in pairs(drives) do
         if drive ~= "serial" then
             local alias = ""
             if drive == DRIVE_UUID_PRIMARY then
@@ -32,11 +42,11 @@ function MapDrives()
                 alias = DRIVE_ALIAS_FLOPPY
             end
 
-            drives[alias] = drive
+            drivesMap[alias] = drive
         end
     end
 
-    return drives
+    return drivesMap
 end
 
 function InitFilesystem()
