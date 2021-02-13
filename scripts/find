@@ -13,6 +13,9 @@ do
     mkdir "$SCRIPT_DIR/../drives/$DRIVE" >/dev/null 2>&1
     mkdir "$SCRIPT_DIR/../drives/$DRIVE/tags" >/dev/null 2>&1
     touch "$SCRIPT_DIR/../drives/$DRIVE/tags/.gitkeep"
+    mkdir "$SCRIPT_DIR/../drives/$DRIVE/data" >/dev/null 2>&1
+    touch "$SCRIPT_DIR/../drives/$DRIVE/data/.gitkeep"
+    cp -rf $DRIVE/data/* "$SCRIPT_DIR/../drives/$DRIVE/data" >/dev/null 2>&1
 done
 
 cd $PWD

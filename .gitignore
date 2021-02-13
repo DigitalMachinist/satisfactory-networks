@@ -1,6 +1,7 @@
 backup
 
-# Ignore drives but leave any tags in each drive.
+# Ignore drives but leave any tags & data in each drive.
 !drives/
 drives/*/*
 !drives/*/tags
+!drives/*/data

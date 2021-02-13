@@ -35,7 +35,7 @@ do
     for DRIVE in $DRIVES
     do
         printf "Updating drive ${RED}$DRIVE${NC} from template ${GREEN}$1/$ALIAS${NC}...\n"
-        find "./$DRIVE" -mindepth 1 -name \* -delete # rm -rf wasn't working here but this does the job.
+        find "./$DRIVE" -mindepth 1 \( -not -path '*/data*' -and -not -path '*/tags*' \) -delete # Delete all but the data & tags folders.
         DIR_DEST="$DIR_DRIVES/$DRIVE"
         cp -rf $DIR_TEMPLATE/$ALIAS/* "$DIR_DEST"
 
