@@ -107,27 +107,27 @@ function MountAllDrives()
 end
 
 function UpdateEEPROM(filepathEEPROM, tagLock)
-    print "!! NOTICE !!"
-    print "To update this EEPROM, copy the contents of eeprom.lua into this terminal (ingame)."
-    print "We will be able to do this automatically after next patch with setEEPROM()!"
+    if fs.exists(tagLock) == false then
+        print "Seems like an EEPROM update is in order."
 
-    -- TODO: Reenable the following after next patch!
-    -- if fs.exists(tagLock) == false then
-    --     -- Read in the new EEPROM code from the given filepath.
-    --     local f = assert(fs.open(filepathEEPROM, "r"))
-    --     local content = f:read("*all")
-    --     f:close()
+        -- Read in the new EEPROM code from the given filepath.
+        local f = assert(fs.open(filepathEEPROM, "r"))
+        local content = f:read("*all")
+        f:close()
 
-    --     -- Update the computer's EEPROM code to the file contents.
-    --     computer.setEEPROM(content)
+        -- Update the computer's EEPROM code to the file contents.
+        computer.setEEPROM(content)
 
-    --     -- Create the a lockfile to prevent further updates.
-    --     f = assert(fs.open(tagLock, "w"))
-    --     f:close()
+        -- Create the a lockfile to prevent further updates.
+        f = assert(fs.open(tagLock, "w"))
+        f:close()
 
-    --     -- Reboot the computer.
-    --     computer.reset()
-    -- end
+        -- Reboot the computer.
+        print "Restarting to apply EEPROM update."
+        computer.reset()
+    else
+        print "No EEPFROM update performed."
+    end
 end
 
 function LoadLibrariesRecursive(dirpath)

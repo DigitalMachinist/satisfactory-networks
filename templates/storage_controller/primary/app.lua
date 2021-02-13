@@ -182,8 +182,7 @@ function App()
             NumStored, StoreSize = GetContainerUsage()
         end
         
-        -- Check if the storage containers are enabled.
-        IsBypassed = BypassToggle:getState()
+        IsBypassed = BypassToggle.state
 
         local eventData = {event.pull(1)}
         if eventData then
@@ -200,7 +199,7 @@ function App()
 
         -- If the splitter has items already sitting in its input queue, transfer them first.
         -- This will ensure that we start getting input events for new items entering the splitter's input queue.
-        if next(Splitter:getMembers()) then
+        if (Splitter:getInput().type ~= nil) then
             HandleSplitterItem(IsBypassed, NumStored, TargetNumStored)
         end
 
