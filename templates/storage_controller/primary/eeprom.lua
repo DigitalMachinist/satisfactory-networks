@@ -123,7 +123,8 @@ function UpdateEEPROM(filepathEEPROM, tagLock)
         f:close()
 
         -- Reboot the computer.
-        print "Restarting to apply EEPROM update."
+        print("Restarting NOW to apply EEPROM update...")
+        print()
         computer.reset()
     else
         print "No EEPFROM update performed."

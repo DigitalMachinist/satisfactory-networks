@@ -18,8 +18,13 @@ BYPASS_TOGGLE_POS = { x = 0, y = 10 }
 BYPASS_LED_POS = { x = 2, y = 10 }
 
 -- The target dial controls the percentage of storage we're targeting to use.
-TARGET_DIAL_POS = { x = 2, y = 9 }
+TARGET_DIAL_POS = { x = 0, y = 9 }
 TARGET_DIAL_SENSITIVITY = 1
+TARGET_LED_POS = { x = 2, y = 9 }
+
+-- Colours
+COLOR_ENABLED = { r = 0.05, g = 1.0, b = 0.05, a = 1.0 }
+COLOR_DISABLED = { r = 0, g = 0, b = 0, a = 0 }
 
 -- Components
 Components = nil
@@ -28,6 +33,7 @@ Panel = nil
 BypassToggle = nil
 BypassLED = nil
 TargetDial = nil
+TargetLED = nil
 
 -- State
 IsBypassed = false      -- Should the entire storage system be bypassed/disabled?
@@ -72,6 +78,7 @@ function InitComponents()
     BypassToggle = Panel:getModule(BYPASS_TOGGLE_POS["x"], BYPASS_TOGGLE_POS["y"])
     BypassLED = Panel:getModule(BYPASS_LED_POS["x"], BYPASS_LED_POS["y"])
     TargetDial = Panel:getModule(TARGET_DIAL_POS["x"], TARGET_DIAL_POS["y"])
+    TargetLED = Panel:getModule(TARGET_LED_POS["x"], TARGET_LED_POS["y"])
 end
 
 function GetContainerUsage()
@@ -112,6 +119,12 @@ function ComputeTargetNumStored(targetPercent)
     return math.floor(targetFraction * StoreSize + 0.5)
 end
 
+function InitStorage()
+    NumStored, StoreSize = GetContainerUsage()
+    TargetPercent = ReadTargetPercentStored("/primary/data/TargetPercentStored")
+    TargetNumStored = ComputeTargetNumStored(TargetPercent)
+end
+
 function PrintStorageStatus()
     local fraction = NumStored / StoreSize
     local percent = fraction * 100
@@ -139,8 +152,24 @@ function Timestep(currentTimeMs)
     return nextTimeMs, elapsedTimeMs
 end
 
-function HandleSplitterItem(isBypassed, numStored, targetNumStored)
-    if (isBypassed or (numStored > targetNumStored)) then
+function SetBypassLEDStatus(isBypassed)
+    if (isBypassed) then
+        BypassLED:setColor(COLOR_ENABLED["r"], COLOR_ENABLED["g"], COLOR_ENABLED["b"], COLOR_ENABLED["a"])
+    else
+        BypassLED:setColor(COLOR_DISABLED["r"], COLOR_DISABLED["g"], COLOR_DISABLED["b"], COLOR_DISABLED["a"])
+    end
+end
+
+function SetTargetLEDStatus(numStored, targetNumStored)
+    if (numStored > targetNumStored) then
+        TargetLED:setColor(COLOR_ENABLED["r"], COLOR_ENABLED["g"], COLOR_ENABLED["b"], COLOR_ENABLED["a"])
+    else
+        TargetLED:setColor(COLOR_DISABLED["r"], COLOR_DISABLED["g"], COLOR_DISABLED["b"], COLOR_DISABLED["a"])
+    end
+end
+
+function HandleSplitter(isBypassed, numStored, targetNumStored)
+    if (isBypassed or (numStored >= targetNumStored)) then
         Transfer()
     end
 end
@@ -154,25 +183,14 @@ function HandleTargetDialChange(anticlockwise)
     TargetPercent = Clamp(TargetPercent + change, 0, 100)
     WriteTargetPercentStored("/primary/data/TargetPercentStored", TargetPercent)
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
-
-    print("Target percent: "..TargetPercent)
-    print("Target percent (file): "..ReadTargetPercentStored("/primary/data/TargetPercentStored"))
 end
 
-function App()
-    InitComponents()
 
-    NumStored, StoreSize = GetContainerUsage()
-    TargetPercent = ReadTargetPercentStored("/primary/data/TargetPercentStored")
-    TargetNumStored = ComputeTargetNumStored(TargetPercent)
-    PrintStorageStatus()
-
-    event.listen(Splitter)
-    event.listen(TargetDial)
-
+function CoStorage()
     local elapsedTimeMs = 0
     local currentTimeMs = computer.millis()
     local containerUpdateCooldownMs = CONTAINER_UPDATE_COOLDOWN_MS
+
     while true do
         -- Update the container usage values (but only every CONTAINER_UPDATE_COOLDOWN_MS).
         currentTimeMs, elapsedTimeMs = Timestep(currentTimeMs)
@@ -181,33 +199,65 @@ function App()
             containerUpdateCooldownMs = CONTAINER_UPDATE_COOLDOWN_MS
             NumStored, StoreSize = GetContainerUsage()
         end
-        
-        IsBypassed = BypassToggle.state
 
-        local eventData = {event.pull(1)}
-        if eventData then
-            local eventType = eventData[1]
-            if eventType == "ItemRequest" then
-                -- Transfer an item for each ItemRequest event receives from the splitter, until we disable it.
-                HandleSplitterItem(IsBypassed, TargetNumStored, StoreSize)
-            elseif eventType == "PotRotate" then
-                -- Update the target number of items to store based on target dial input.
-                local anticlockwise = eventData[3]
-                HandleTargetDialChange(anticlockwise)
-            end
-        end
+        -- Check bypass toggle status and update LEDs if splitter should be transferring items.
+        IsBypassed = not BypassToggle.state
+        SetBypassLEDStatus(IsBypassed)
+        SetTargetLEDStatus(NumStored, TargetNumStored)
 
-        -- If the splitter has items already sitting in its input queue, transfer them first.
-        -- This will ensure that we start getting input events for new items entering the splitter's input queue.
+        -- Release items out of storage if it's at target or bypassed.
         if (Splitter:getInput().type ~= nil) then
-            HandleSplitterItem(IsBypassed, NumStored, TargetNumStored)
+            -- print('Splitter input set')
+            HandleSplitter(IsBypassed, NumStored, TargetNumStored)
         end
 
-        if IsBypassed then
-            -- Prevent "out of time" error for infinite loop timeout.
-            computer.skip()
+        event.pull(0.0)
+    end
+end
+
+function CoPanelDisplays()
+    local gpus = computer.getGPUs()
+    for _, g in pairs(gpus) do
+        print(g)
+    end
+    print()
+
+    while true do
+        -- UpdateNumericDisplay()
+        -- UpdateGraphDisplay()
+
+        event.pull(0.0)
+    end
+end
+
+function CoPanelEvents()
+    event.listen(TargetDial)
+    print(TargetDial)
+
+    while true do
+        -- Handle the next event in the queue, if any.
+        local eventData = {event.pull(0.0)}
+        local eventType = eventData[1]
+        if eventType == "PotRotate" then
+            -- Update the target number of items to store based on the target dial being rotated.
+            print("PotRotate")
+            local anticlockwise = eventData[3]
+            HandleTargetDialChange(anticlockwise)
         end
     end
+end
+
+function App()
+    InitComponents()
+    InitStorage()
+    PrintStorageStatus()
+
+    -- CoHandleStorage = Thread.create(CoStorage)
+    -- CoHandlePanelDisplays = Thread.create(CoPanelDisplays)
+    -- CoHandlePanelEvents = Thread.create(CoPanelEvents)
+    -- Thread.run()
+
+    CoPanelEvents()
 end
 
 App()
