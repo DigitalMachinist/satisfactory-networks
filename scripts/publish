@@ -9,6 +9,10 @@ TIMESTAMP=`date +%Y-%m-%d_%H-%M-%S`
 echo "Backing up Satisfactory folder..."
 cp -rf "$DEST_DIR" "$SCRIPT_DIR/../backup/$TIMESTAMP"
 
+# Use the find script to sync data from the Satisfactory state.
+# This is important to maintain settings of computer systems set up ingame!!!
+./find >/dev/null 2>&1
+
 # Delete the existing computer configuration.
 echo "Cleaning Satisfactory folder..."
 cd "$DEST_DIR"

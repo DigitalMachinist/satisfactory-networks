@@ -13,31 +13,33 @@ SPLITTER_OUTPUT = SPLITTER_OUTPUT_CENTER
 -- The control panel is where all controls and displays will appear.
 PANEL_NAME = "Panel"
 
--- The bypass toggle controls whether the storage system should store items *at all*.
-BYPASS_TOGGLE_POS = { x = 0, y = 10 }
-BYPASS_LED_POS = { x = 2, y = 10 }
+-- The bypass controls whether the storage system should hold items or allow them to flow out.
+BYPASS_BUTTON_POS = { x = 5, y = 10 }
 
 -- The target dial controls the percentage of storage we're targeting to use.
-TARGET_DIAL_POS = { x = 0, y = 9 }
-TARGET_DIAL_SENSITIVITY = 1
-TARGET_LED_POS = { x = 2, y = 9 }
+TARGET_DIAL_POS = { x = 5, y = 9 }
+TARGET_DIAL_SENSITIVITY = 5
+
+-- The flow LED signal the status of flow through the storage system.
+FLOW_LED_POS = { x = 5, y = 10 }
 
 -- Colours
-COLOR_ENABLED = { r = 0.05, g = 1.0, b = 0.05, a = 1.0 }
-COLOR_DISABLED = { r = 0, g = 0, b = 0, a = 0 }
+COLOR_OVERBYPASS = { r = 0.1, g = 1.0, b = 1.0, a = 1.0 } -- Bypassed but it would flow even if it wasn't
+COLOR_BYPASSED   = { r = 0.1, g = 0.1, b = 1.0, a = 1.0 }
+COLOR_FLOWING    = { r = 0.1, g = 1.0, b = 0.1, a = 1.0 }
+COLOR_HOLDING    = { r = 1.0, g = 0.1, b = 0.1, a = 1.0 }
 
 -- Components
 Components = nil
 Splitter = nil
 Panel = nil
-BypassToggle = nil
-BypassLED = nil
+BypassButton = nil
 TargetDial = nil
-TargetLED = nil
+FlowLED = nil
 
 -- State
 IsBypassed = false      -- Should the entire storage system be bypassed/disabled?
-TargetPercent = nil     -- The percentage of the available storage we aim to use.
+TargetPercent = 100     -- The percentage of the available storage we aim to use.
 TargetNumStored = nil   -- The number of stored items we aim to keep (anything beyond this is overflow).
 NumStored = nil         -- The current number of stored items.
 StoreSize = nil         -- The total size of the storage media.
@@ -75,10 +77,9 @@ function InitComponents()
     Containers = GetContainers(CONTAINER_NAME)
     Splitter = GetSplitter(SPLITTER_NAME)
     Panel = GetPanel(PANEL_NAME)
-    BypassToggle = Panel:getModule(BYPASS_TOGGLE_POS["x"], BYPASS_TOGGLE_POS["y"])
-    BypassLED = Panel:getModule(BYPASS_LED_POS["x"], BYPASS_LED_POS["y"])
+    BypassButton = Panel:getModule(BYPASS_BUTTON_POS["x"], BYPASS_BUTTON_POS["y"])
     TargetDial = Panel:getModule(TARGET_DIAL_POS["x"], TARGET_DIAL_POS["y"])
-    TargetLED = Panel:getModule(TARGET_LED_POS["x"], TARGET_LED_POS["y"])
+    FlowLED = Panel:getModule(FLOW_LED_POS["x"], FLOW_LED_POS["y"])
 end
 
 function GetContainerUsage()
@@ -94,22 +95,23 @@ function GetContainerUsage()
     return totalUsed, totalSize
 end
 
-function ReadTargetPercentStored(filepath)
+function ReadValueFile(filepath)
     if (fs.exists(filepath) and fs.isFile(filepath)) then
         local f = fs.open(filepath, "r")
-        local targetPercent = f:read("*all")
+        local value = f:read("*all")
         f:close()
 
-        return tonumber(targetPercent)
+        return value
     end
 
     return nil
 end
 
-function WriteTargetPercentStored(filepath, targetPercent)
-    if (fs.exists(filepath) and fs.isFile(filepath)) then
+function WriteValueFile(filepath, value)
+    local exists = fs.exists(filepath)
+    if (not exists or (exists and fs.isFile(filepath))) then
         local f = fs.open(filepath, "w")
-        f:write(TargetPercent)
+        f:write(tostring(value))
         f:close()
     end
 end
@@ -121,7 +123,8 @@ end
 
 function InitStorage()
     NumStored, StoreSize = GetContainerUsage()
-    TargetPercent = ReadTargetPercentStored("/primary/data/TargetPercentStored")
+    IsBypassed = ReadValueFile("/primary/data/IsBypassed") == "true"
+    TargetPercent = tonumber(ReadValueFile("/primary/data/TargetPercentStored"))
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
 end
 
@@ -146,105 +149,84 @@ function Transfer()
     end
 end
 
-function Timestep(currentTimeMs)
-    local nextTimeMs = computer.millis()
-    local elapsedTimeMs = nextTimeMs - currentTimeMs
-    return nextTimeMs, elapsedTimeMs
-end
-
-function SetBypassLEDStatus(isBypassed)
-    if (isBypassed) then
-        BypassLED:setColor(COLOR_ENABLED["r"], COLOR_ENABLED["g"], COLOR_ENABLED["b"], COLOR_ENABLED["a"])
+function SetFlowLEDStatus()
+    local color = nil
+    if (IsBypassed and (NumStored >= TargetNumStored)) then
+        color = COLOR_OVERBYPASS
+    elseif (NumStored >= TargetNumStored) then
+        color = COLOR_FLOWING
+    elseif (IsBypassed) then
+        color = COLOR_BYPASSED
     else
-        BypassLED:setColor(COLOR_DISABLED["r"], COLOR_DISABLED["g"], COLOR_DISABLED["b"], COLOR_DISABLED["a"])
+        color = COLOR_HOLDING
     end
+
+    FlowLED:setColor(color['r'], color['g'], color['b'], color['a']);
 end
 
-function SetTargetLEDStatus(numStored, targetNumStored)
-    if (numStored > targetNumStored) then
-        TargetLED:setColor(COLOR_ENABLED["r"], COLOR_ENABLED["g"], COLOR_ENABLED["b"], COLOR_ENABLED["a"])
-    else
-        TargetLED:setColor(COLOR_DISABLED["r"], COLOR_DISABLED["g"], COLOR_DISABLED["b"], COLOR_DISABLED["a"])
-    end
-end
-
-function HandleSplitter(isBypassed, numStored, targetNumStored)
-    if (isBypassed or (numStored >= targetNumStored)) then
-        Transfer()
-    end
+function HandleBypassButtonPush()
+    IsBypassed = not IsBypassed
+    WriteValueFile("/primary/data/IsBypassed", IsBypassed)
 end
 
 function HandleTargetDialChange(anticlockwise)
-    local change = TARGET_DIAL_SENSITIVITY
+    local change = -TARGET_DIAL_SENSITIVITY
     if (anticlockwise) then
         change = -1 * change
     end
 
     TargetPercent = Clamp(TargetPercent + change, 0, 100)
-    WriteTargetPercentStored("/primary/data/TargetPercentStored", TargetPercent)
+    WriteValueFile("/primary/data/TargetPercentStored", TargetPercent)
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
 end
 
-
-function CoStorage()
-    local elapsedTimeMs = 0
-    local currentTimeMs = computer.millis()
-    local containerUpdateCooldownMs = CONTAINER_UPDATE_COOLDOWN_MS
-
-    while true do
-        -- Update the container usage values (but only every CONTAINER_UPDATE_COOLDOWN_MS).
-        currentTimeMs, elapsedTimeMs = Timestep(currentTimeMs)
-        containerUpdateCooldownMs = containerUpdateCooldownMs - elapsedTimeMs
-        if (containerUpdateCooldownMs <= 0) then
-            containerUpdateCooldownMs = CONTAINER_UPDATE_COOLDOWN_MS
-            NumStored, StoreSize = GetContainerUsage()
-        end
-
-        -- Check bypass toggle status and update LEDs if splitter should be transferring items.
-        IsBypassed = not BypassToggle.state
-        SetBypassLEDStatus(IsBypassed)
-        SetTargetLEDStatus(NumStored, TargetNumStored)
-
-        -- Release items out of storage if it's at target or bypassed.
-        if (Splitter:getInput().type ~= nil) then
-            -- print('Splitter input set')
-            HandleSplitter(IsBypassed, NumStored, TargetNumStored)
-        end
-
-        event.pull(0.0)
-    end
-end
-
-function CoPanelDisplays()
-    local gpus = computer.getGPUs()
-    for _, g in pairs(gpus) do
-        print(g)
-    end
-    print()
-
-    while true do
-        -- UpdateNumericDisplay()
-        -- UpdateGraphDisplay()
-
-        event.pull(0.0)
-    end
-end
-
-function CoPanelEvents()
-    event.listen(TargetDial)
-    print(TargetDial)
-
-    while true do
-        -- Handle the next event in the queue, if any.
-        local eventData = {event.pull(0.0)}
+function HandleEvents(maxEventsToPop)
+    for i = 1, maxEventsToPop do
+        local eventData = {event.pull(0)}
         local eventType = eventData[1]
-        if eventType == "PotRotate" then
+        if eventType == nil then
+            -- If no eventType was set, the last event has been popped and we should return to the caller.
+            return
+        end
+
+        --print("Event: "..eventType)
+        if eventType == "Trigger" then
+            -- Toggle IsBypassed
+            HandleBypassButtonPush()
+            print("Bypass updated to "..tostring(IsBypassed))
+        elseif eventType == "PotRotate" then
             -- Update the target number of items to store based on the target dial being rotated.
-            print("PotRotate")
             local anticlockwise = eventData[3]
             HandleTargetDialChange(anticlockwise)
+            print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
         end
     end
+end
+
+function ReadInput()
+    -- TODO: Maybe only run this occasionally because it could be expensive...
+    NumStored, StoreSize = GetContainerUsage()
+end
+
+function TransferItems(maxItemsToTransfer)
+    for i = 1, maxItemsToTransfer do
+        -- If the splitter's input buffer is empty, return immediately.
+        if (Splitter:getInput().type == nil) then
+            return;
+        end
+
+        -- If storage is still filling up to the target and the bypass hasn't been enabled, we don't want to transfer.
+        if ((NumStored < TargetNumStored) and not IsBypassed) then
+            return
+        end
+
+        -- Otherwise transfer (if the storage is at target or bypass is enabled).
+        Transfer()
+    end
+end
+
+function OutputFeedback()
+    SetFlowLEDStatus()
 end
 
 function App()
@@ -252,12 +234,15 @@ function App()
     InitStorage()
     PrintStorageStatus()
 
-    -- CoHandleStorage = Thread.create(CoStorage)
-    -- CoHandlePanelDisplays = Thread.create(CoPanelDisplays)
-    -- CoHandlePanelEvents = Thread.create(CoPanelEvents)
-    -- Thread.run()
+    event.listen(BypassButton)
+    event.listen(TargetDial)
 
-    CoPanelEvents()
+    while true do
+        HandleEvents(5)
+        ReadInput()
+        TransferItems(5)
+        OutputFeedback()
+    end
 end
 
 App()
