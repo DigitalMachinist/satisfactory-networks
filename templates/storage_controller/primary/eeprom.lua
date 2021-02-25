@@ -125,6 +125,8 @@ function UpdateEEPROM(filepathEEPROM, tagLock)
         -- Reboot the computer.
         print("Restarting NOW to apply EEPROM update...")
         print()
+        print("=== RESTART! ===")
+        print()
         computer.reset()
     else
         print "No EEPFROM update performed."

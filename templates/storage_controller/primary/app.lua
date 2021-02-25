@@ -1,36 +1,5 @@
--- Constants about the items to be stored.
-ITEM_TYPE = "Concrete"
-ITEM_STACK_SIZE = 500
-
--- The containers make up the actual storage medium backing the storage controller.
-CONTAINER_NAME = "Container"
-CONTAINER_UPDATE_COOLDOWN_MS = 1000
-
--- The splitter is used to control item flow and maintain the target number of items.
-SPLITTER_NAME = "Splitter"
-SPLITTER_OUTPUT = SPLITTER_OUTPUT_CENTER
-
--- The control panel is where all controls and displays will appear.
-PANEL_NAME = "Panel"
-
--- The bypass controls whether the storage system should hold items or allow them to flow out.
-BYPASS_BUTTON_POS = { x = 5, y = 10 }
-
--- The target dial controls the percentage of storage we're targeting to use.
-TARGET_DIAL_POS = { x = 5, y = 9 }
-TARGET_DIAL_SENSITIVITY = 5
-
--- The flow LED signal the status of flow through the storage system.
-FLOW_LED_POS = { x = 5, y = 10 }
-
--- Colours
-COLOR_OVERBYPASS = { r = 0.1, g = 1.0, b = 1.0, a = 1.0 } -- Bypassed but it would flow even if it wasn't
-COLOR_BYPASSED   = { r = 0.1, g = 0.1, b = 1.0, a = 1.0 }
-COLOR_FLOWING    = { r = 0.1, g = 1.0, b = 0.1, a = 1.0 }
-COLOR_HOLDING    = { r = 1.0, g = 0.1, b = 0.1, a = 1.0 }
-
 -- Components
-Components = nil
+Containers = nil
 Splitter = nil
 Panel = nil
 BypassButton = nil
@@ -45,6 +14,15 @@ NumStored = nil         -- The current number of stored items.
 StoreSize = nil         -- The total size of the storage media.
 SpitterOutIndex = 0     -- The index of of the output the splitter last transferred an item to.
 fs = filesystem
+
+function LoadConfig(filepath)
+    if (fs.exists(filepath) and fs.isFile(filepath)) == false then
+        computer.panic("Unable to find app config at "..filepath..".")
+    end
+
+    print("Loading app config from "..filepath.."...")
+    fs.doFile(filepath)
+end
 
 function GetContainers(nickname)
     local cContainers = component.findComponent(nickname)
@@ -161,7 +139,7 @@ function SetFlowLEDStatus()
         color = COLOR_HOLDING
     end
 
-    FlowLED:setColor(color['r'], color['g'], color['b'], color['a']);
+    FlowLED:setColor(color["r"], color["g"], color["b"], color["a"]);
 end
 
 function HandleBypassButtonPush()
@@ -230,17 +208,21 @@ function OutputFeedback()
 end
 
 function App()
+    LoadConfig("/primary/app_config.lua")
+    print()
     InitComponents()
     InitStorage()
+    print("STORAGE STATUS:")
     PrintStorageStatus()
+    print()
 
     event.listen(BypassButton)
     event.listen(TargetDial)
 
     while true do
-        HandleEvents(5)
+        HandleEvents(MAX_EVENT_HANDLING_RATE)
         ReadInput()
-        TransferItems(5)
+        TransferItems(MAX_ITEM_TRANSFER_RATE)
         OutputFeedback()
     end
 end
