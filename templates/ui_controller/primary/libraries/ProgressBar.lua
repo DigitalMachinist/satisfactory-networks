@@ -12,7 +12,7 @@ function ProgressBar(gpu, fraction, x, y, w, h, bgColor, fgColor, borderPadding,
         borderPadding = 0
     end
 
-    -- Compute inner dimensions (inside border after padding is applied).
+    -- Compute inner dimensions (inside border after apdding is applied).
     local ix = x + (2 * borderPadding)
     local iy = y + borderPadding
     local iw = w - (4 * borderPadding)
