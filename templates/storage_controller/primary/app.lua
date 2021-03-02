@@ -1,18 +1,25 @@
 -- Components
+GPU = nil
 Containers = nil
 Splitter = nil
 Panel = nil
 BypassButton = nil
 TargetDial = nil
 FlowLED = nil
+TextStatusScreen = nil
+GraphicStatusScreen = nil
 
 -- State
-IsBypassed = false      -- Should the entire storage system be bypassed/disabled?
-TargetPercent = 100     -- The percentage of the available storage we aim to use.
-TargetNumStored = nil   -- The number of stored items we aim to keep (anything beyond this is overflow).
-NumStored = nil         -- The current number of stored items.
-StoreSize = nil         -- The total size of the storage media.
-SpitterOutIndex = 0     -- The index of of the output the splitter last transferred an item to.
+IsBypassed = false    -- Should the entire storage system be bypassed/disabled?
+TargetPercent = 100   -- The percentage of the available storage we aim to use.
+TargetNumStored = nil -- The number of stored items we aim to keep (anything beyond this is overflow).
+FractionStored = nil  -- The fraction of available storage that is filled with items [0, 1].
+PercentStored = nil   -- The percentage of available storage that is filled with items [0, 100].
+NumStored = nil       -- The current number of stored items [0, +inf].
+StoreSize = nil       -- The total size of the storage media [0, +inf].
+SpitterOutIndex = 0   -- The index of of the output the splitter last transferred an item to.
+PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
+
 fs = filesystem
 
 function LoadConfig(filepath)
@@ -52,12 +59,15 @@ function GetPanel(nickname)
 end
 
 function InitComponents()
+    GPU = computer.getGPUs()[1]
     Containers = GetContainers(CONTAINER_NAME)
     Splitter = GetSplitter(SPLITTER_NAME)
     Panel = GetPanel(PANEL_NAME)
     BypassButton = Panel:getModule(BYPASS_BUTTON_POS["x"], BYPASS_BUTTON_POS["y"])
     TargetDial = Panel:getModule(TARGET_DIAL_POS["x"], TARGET_DIAL_POS["y"])
     FlowLED = Panel:getModule(FLOW_LED_POS["x"], FLOW_LED_POS["y"])
+    TextStatusScreen = Panel:getModule(TEXT_STATUS_SCREEN_POS["x"], TEXT_STATUS_SCREEN_POS["y"])
+    GraphicStatusScreen = Panel:getModule(GRAPHIC_STATUS_SCREEN_POS["x"], GRAPHIC_STATUS_SCREEN_POS["y"])
 end
 
 function GetContainerUsage()
@@ -107,10 +117,10 @@ function InitStorage()
 end
 
 function PrintStorageStatus()
-    local fraction = NumStored / StoreSize
-    local percent = fraction * 100
+    FractionStored = NumStored / StoreSize
+    PercentStored = FractionStored * 100
     print("Usage: "..NumStored.." / "..StoreSize)
-    print("Percent: "..tonumber(string.format("%.0f", percent)).."%")
+    print("Percent: "..tonumber(string.format("%.0f", PercentStored)).."%")
     print("Target Usage: "..TargetNumStored.." / "..StoreSize)
     print("Target Percent: "..tonumber(string.format("%.0f", TargetPercent)).."%")
 end
@@ -145,6 +155,7 @@ end
 function HandleBypassButtonPush()
     IsBypassed = not IsBypassed
     WriteValueFile("/primary/data/IsBypassed", IsBypassed)
+    OutputFeedback()
 end
 
 function HandleTargetDialChange(anticlockwise)
@@ -156,6 +167,7 @@ function HandleTargetDialChange(anticlockwise)
     TargetPercent = Clamp(TargetPercent + change, 0, 100)
     WriteValueFile("/primary/data/TargetPercentStored", TargetPercent)
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
+    OutputFeedback()
 end
 
 function HandleEvents(maxEventsToPop)
@@ -205,6 +217,54 @@ end
 
 function OutputFeedback()
     SetFlowLEDStatus()
+    DrawText()
+    DrawGraphics()
+    PrevFeedbackTime = computer.millis()
+end
+
+function DrawText()
+    if (TextStatusScreen == nil) then
+        return
+    end
+
+    TextStatusScreen.size = 36
+    local lines = {
+        " "..ITEM_TYPE.." ("..tonumber(string.format("%.0f", PercentStored)).."%)",
+        " = "..NumStored.." / "..StoreSize,
+        " > "..TargetNumStored.." ("..TargetPercent.."%)"
+    }
+    TextStatusScreen.text = table.concat(lines, '\n')
+end
+
+function DrawGraphics()
+    if (GPU == nil) then
+        return
+    end
+
+    -- Point the GPU at the screen we want to render to right now.
+    GPU:bindScreen(GraphicStatusScreen)
+
+    -- Clear the screen back to black.
+    GPU:setBackground(UI_CLEAR_COLOR[1], UI_CLEAR_COLOR[2], UI_CLEAR_COLOR[3], UI_CLEAR_COLOR[4])
+    GPU:fill(0, 0, GRAPHIC_STATUS_SCREEN_SIZE["x"], GRAPHIC_STATUS_SCREEN_SIZE["y"], " ", " ")
+    GPU:flush()
+
+    -- Draw fill meter.
+    local x = 0
+    local y = math.floor(GRAPHIC_STATUS_SCREEN_SIZE["y"] / 4)
+    local w = GRAPHIC_STATUS_SCREEN_SIZE["x"]
+    local h = GRAPHIC_STATUS_SCREEN_SIZE["y"] / 2
+    local targetFraction = TargetPercent / 100
+    local targetThickness = 1
+    local borderPadding = 2
+    ProgressBar(
+        GPU,
+        FractionStored, x, y, w, h, UI_METER_BG_COLOR, UI_METER_FG_COLOR,  -- Progress
+        borderPadding, UI_METER_BORDER_COLOR,                              -- Border
+        targetFraction, targetThickness, UI_METER_TARGET_COLOR             -- Target
+    )
+
+    GPU:flush()
 end
 
 function App()
@@ -215,6 +275,8 @@ function App()
     print("STORAGE STATUS:")
     PrintStorageStatus()
     print()
+    print("Starting...")
+    print()
 
     event.listen(BypassButton)
     event.listen(TargetDial)
@@ -223,7 +285,11 @@ function App()
         HandleEvents(MAX_EVENT_HANDLING_RATE)
         ReadInput()
         TransferItems(MAX_ITEM_TRANSFER_RATE)
-        OutputFeedback()
+
+        -- Poll every so many ms to update the UI (but skip this most of the time)
+        if (computer.millis() >= PrevFeedbackTime + FEEDBACK_RATE_MS) then
+            OutputFeedback()
+        end
     end
 end
 
