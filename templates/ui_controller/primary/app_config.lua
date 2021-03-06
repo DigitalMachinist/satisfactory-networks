@@ -23,10 +23,10 @@ UI_METER_BORDER_COLOR      = { 1, 1, 1, 1 }
 UI_METER_TARGET_COLOR      = { 1, 1, 1, 1 }
 
 -- Colours
-COLOR_OVERBYPASS = { r = 0.1, g = 1.0, b = 1.0, a = 1.0 } -- Bypassed but it would flow even if it wasn't
-COLOR_BYPASSED   = { r = 0.1, g = 0.1, b = 1.0, a = 1.0 }
-COLOR_FLOWING    = { r = 0.1, g = 1.0, b = 0.1, a = 1.0 }
-COLOR_HOLDING    = { r = 1.0, g = 0.1, b = 0.1, a = 1.0 }
+COLOR_OVERBYPASS = { 0.1, 1.0, 1.0, 1.0 } -- Bypassed but it would flow even if it wasn't
+COLOR_BYPASSED   = { 0.1, 0.1, 1.0, 1.0 }
+COLOR_FLOWING    = { 0.1, 1.0, 0.1, 1.0 }
+COLOR_HOLDING    = { 1.0, 0.1, 0.1, 1.0 }
 
 -- The important stuff
 ITEM_TYPE                = "Concrete"    -- To visually display the type of item stored.

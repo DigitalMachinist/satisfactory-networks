@@ -11,7 +11,9 @@ cp -rf "$DEST_DIR" "$SCRIPT_DIR/../backup/$TIMESTAMP"
 
 # Use the find script to sync data from the Satisfactory state.
 # This is important to maintain settings of computer systems set up ingame!!!
-./find >/dev/null 2>&1
+if [ -z "$1" ]; then
+    ./find >/dev/null 2>&1
+fi
 
 # Delete the existing computer configuration.
 echo "Cleaning Satisfactory folder..."

@@ -83,27 +83,6 @@ function GetContainerUsage()
     return totalUsed, totalSize
 end
 
-function ReadValueFile(filepath)
-    if (fs.exists(filepath) and fs.isFile(filepath)) then
-        local f = fs.open(filepath, "r")
-        local value = f:read("*all")
-        f:close()
-
-        return value
-    end
-
-    return nil
-end
-
-function WriteValueFile(filepath, value)
-    local exists = fs.exists(filepath)
-    if (not exists or (exists and fs.isFile(filepath))) then
-        local f = fs.open(filepath, "w")
-        f:write(tostring(value))
-        f:close()
-    end
-end
-
 function ComputeTargetNumStored(targetPercent)
     local targetFraction = targetPercent / 100
     return math.floor(targetFraction * StoreSize + 0.5)
@@ -111,8 +90,8 @@ end
 
 function InitStorage()
     NumStored, StoreSize = GetContainerUsage()
-    IsBypassed = ReadValueFile("/primary/data/IsBypassed") == "true"
-    TargetPercent = tonumber(ReadValueFile("/primary/data/TargetPercentStored"))
+    IsBypassed = ValueFileRead("/primary/data/IsBypassed") == "true"
+    TargetPercent = tonumber(ValueFileRead("/primary/data/TargetPercentStored"))
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
 end
 
@@ -154,7 +133,7 @@ end
 
 function HandleBypassButtonPush()
     IsBypassed = not IsBypassed
-    WriteValueFile("/primary/data/IsBypassed", IsBypassed)
+    ValueFileWrite("/primary/data/IsBypassed", IsBypassed)
     OutputFeedback()
 end
 
@@ -165,7 +144,7 @@ function HandleTargetDialChange(anticlockwise)
     end
 
     TargetPercent = Clamp(TargetPercent + change, 0, 100)
-    WriteValueFile("/primary/data/TargetPercentStored", TargetPercent)
+    ValueFileWrite("/primary/data/TargetPercentStored", TargetPercent)
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
     OutputFeedback()
 end
@@ -269,6 +248,8 @@ end
 
 function App()
     LoadConfig("/primary/app_config.lua")
+    IsBypassed = ValueFileRead("/primary/IsBypassed")
+    TargetPercent = ValueFileRead("primary/TargetPercentStored")
     print()
     InitComponents()
     InitStorage()

@@ -22,73 +22,15 @@ PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
 
 fs = filesystem
 
-function LoadConfig(filepath)
-    if (fs.exists(filepath) and fs.isFile(filepath)) == false then
-        computer.panic("Unable to find app config at "..filepath..".")
-    end
-
-    print("Loading app config from "..filepath.."...")
-    fs.doFile(filepath)
-end
-
-function GetContainers(nickname)
-    local cContainers = component.findComponent(nickname)
-    if cContainers == nil then
-        computer.panic("No containers ("..nickname..") were found.")
-    end
-
-    return component.proxy(cContainers)
-end
-
-function GetSplitter(nickname)
-    local cSplitter = component.findComponent(nickname)[1]
-    if cSplitter == nil then
-        computer.panic("Splitter ("..nickname..") not found.")
-    end
-
-    return component.proxy(cSplitter)
-end
-
-function GetPanel(nickname)
-    local cPanel = component.findComponent(nickname)[1]
-    if cPanel == nil then
-        computer.panic("Panel ("..nickname..") not found.")
-    end
-
-    return component.proxy(cPanel)
-end
-
 function InitComponents()
-    GPU = computer.getGPUs()[1]
-    Containers = GetContainers(CONTAINER_NAME)
-    Splitter = GetSplitter(SPLITTER_NAME)
-    Panel = GetPanel(PANEL_NAME)
-    BypassButton = Panel:getModule(BYPASS_BUTTON_POS["x"], BYPASS_BUTTON_POS["y"])
-    TargetDial = Panel:getModule(TARGET_DIAL_POS["x"], TARGET_DIAL_POS["y"])
-    FlowLED = Panel:getModule(FLOW_LED_POS["x"], FLOW_LED_POS["y"])
-    TextStatusScreen = Panel:getModule(TEXT_STATUS_SCREEN_POS["x"], TEXT_STATUS_SCREEN_POS["y"])
-    GraphicStatusScreen = Panel:getModule(GRAPHIC_STATUS_SCREEN_POS["x"], GRAPHIC_STATUS_SCREEN_POS["y"])
-end
-
-function ReadValueFile(filepath)
-    if (fs.exists(filepath) and fs.isFile(filepath)) then
-        local f = fs.open(filepath, "r")
-        local value = f:read("*all")
-        f:close()
-
-        return value
-    end
-
-    return nil
-end
-
-function WriteValueFile(filepath, value)
-    local exists = fs.exists(filepath)
-    if (not exists or (exists and fs.isFile(filepath))) then
-        local f = fs.open(filepath, "w")
-        f:write(tostring(value))
-        f:close()
-    end
+    GPU = GetGPU()
+    NIC = GetNIC()
+    Panel = GetComponentByNick(PANEL_NAME)
+    BypassButton = GetModuleOnPanel(Panel, BYPASS_BUTTON_POS)
+    TargetDial = GetModuleOnPanel(Panel, TARGET_DIAL_POS)
+    FlowLED = GetModuleOnPanel(FLOW_LED_POS)
+    TextStatusScreen = GetModuleOnPanel(TEXT_STATUS_SCREEN_POS)
+    GraphicStatusScreen = GetModuleOnPanel(GRAPHIC_STATUS_SCREEN_POS)
 end
 
 function SetFlowLEDStatus()
@@ -103,12 +45,12 @@ function SetFlowLEDStatus()
         color = COLOR_HOLDING
     end
 
-    FlowLED:setColor(color["r"], color["g"], color["b"], color["a"]);
+    FlowLED:setColor(color[1], color[2], color[3], color[4]);
 end
 
 function HandleBypassButtonPush()
     IsBypassed = not IsBypassed
-    WriteValueFile("/primary/data/IsBypassed", IsBypassed)
+    ValueFileWrite("/primary/data/IsBypassed", IsBypassed)
     OutputFeedback()
 end
 
@@ -119,7 +61,7 @@ function HandleTargetDialChange(anticlockwise)
     end
 
     TargetPercent = Clamp(TargetPercent + change, 0, 100)
-    WriteValueFile("/primary/data/TargetPercentStored", TargetPercent)
+    ValueFileWrite("/primary/data/TargetPercentStored", TargetPercent)
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
     OutputFeedback()
 end
@@ -205,7 +147,7 @@ function DrawGraphics()
 end
 
 function App()
-    LoadConfig("/primary/app_config.lua")
+    RunFile("/primary/app_config.lua", true, "app config")
     print()
     InitComponents()
     InitStorage()
