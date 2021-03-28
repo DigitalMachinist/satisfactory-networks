@@ -38,6 +38,8 @@ do
         find "./$DRIVE" -mindepth 1 \( -not -path '*/data*' \) -delete # Delete all but the data folder.
         DIR_DEST="$DIR_DRIVES/$DRIVE"
         cp -rf $DIR_TEMPLATE/$ALIAS/* "$DIR_DEST"
+        cp -rf "$DIR_SCRIPT/../libraries" "$DIR_DEST"
+        cp "$DIR_SCRIPT/../eeprom.lua" "$DIR_DEST"
 
         # If this is a primary drive and eeprom.lua exists, rewrite {DRIVE_UUID_PRIMARY} to the drive's UUID.
         if [ $ALIAS = "primary" ]; then

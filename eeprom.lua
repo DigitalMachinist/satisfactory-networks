@@ -13,12 +13,6 @@ DRIVE_ALIAS_PRIMARY = "primary"
 DRIVE_ALIAS_SECONDARY = "secondary"
 DRIVE_ALIAS_FLOPPY = "floppy"
 
--- Splitter contants.
-SPLITTER_OUTPUT_LEFT = 0
-SPLITTER_OUTPUT_CENTER = 1
-SPLITTER_OUTPUT_RIGHT = 2
-SPLITTER_NUM_OUTPUTS = 3
-
 -- State
 __Drives = nil
 fs = filesystem
@@ -143,6 +137,7 @@ function LoadLibrariesRecursive(dirpath)
         else
             -- Only load *.lua files
             if path:sub(-4) == ".lua" then
+                print(path)
                 if fs.doFile(path) then
                     print(i..". "..path.." execution failed.")
                 else
