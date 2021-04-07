@@ -1,11 +1,11 @@
 -- Components
 GPU = nil
+NIC = nil
 Containers = nil
 Splitter = nil
 Panel = nil
 BypassButton = nil
 TargetDial = nil
-FlowLED = nil
 TextStatusScreen = nil
 GraphicStatusScreen = nil
 
@@ -17,65 +17,30 @@ FractionStored = nil  -- The fraction of available storage that is filled with i
 PercentStored = nil   -- The percentage of available storage that is filled with items [0, 100].
 NumStored = nil       -- The current number of stored items [0, +inf].
 StoreSize = nil       -- The total size of the storage media [0, +inf].
-SpitterOutIndex = 0   -- The index of of the output the splitter last transferred an item to.
+SplitterOutIndex = 0  -- The index of of the output the splitter last transferred an item to.
 PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
-
-fs = filesystem
-
-function LoadConfig(filepath)
-    if (fs.exists(filepath) and fs.isFile(filepath)) == false then
-        computer.panic("Unable to find app config at "..filepath..".")
-    end
-
-    print("Loading app config from "..filepath.."...")
-    fs.doFile(filepath)
-end
-
-function GetContainers(nickname)
-    local cContainers = component.findComponent(nickname)
-    if cContainers == nil then
-        computer.panic("No containers ("..nickname..") were found.")
-    end
-
-    return component.proxy(cContainers)
-end
-
-function GetSplitter(nickname)
-    local cSplitter = component.findComponent(nickname)[1]
-    if cSplitter == nil then
-        computer.panic("Splitter ("..nickname..") not found.")
-    end
-
-    return component.proxy(cSplitter)
-end
-
-function GetPanel(nickname)
-    local cPanel = component.findComponent(nickname)[1]
-    if cPanel == nil then
-        computer.panic("Panel ("..nickname..") not found.")
-    end
-
-    return component.proxy(cPanel)
-end
+NetworkUI = nil       -- Address of the network UI that will be handling I/O for this storage system.
+mp = MessagePack()
 
 function InitComponents()
-    GPU = computer.getGPUs()[1]
-    Containers = GetContainers(CONTAINER_NAME)
-    Splitter = GetSplitter(SPLITTER_NAME)
-    Panel = GetPanel(PANEL_NAME)
-    BypassButton = Panel:getModule(BYPASS_BUTTON_POS["x"], BYPASS_BUTTON_POS["y"])
-    TargetDial = Panel:getModule(TARGET_DIAL_POS["x"], TARGET_DIAL_POS["y"])
-    FlowLED = Panel:getModule(FLOW_LED_POS["x"], FLOW_LED_POS["y"])
-    TextStatusScreen = Panel:getModule(TEXT_STATUS_SCREEN_POS["x"], TEXT_STATUS_SCREEN_POS["y"])
-    GraphicStatusScreen = Panel:getModule(GRAPHIC_STATUS_SCREEN_POS["x"], GRAPHIC_STATUS_SCREEN_POS["y"])
+    GPU = GetGPU(false)
+    NIC = GetNIC(false)
+    Containers = GetComponentsByNick(CONTAINER_NAME)
+    Splitter = GetComponentByNick(SPLITTER_NAME)
+    Panel = GetComponentByNick(PANEL_NAME)
+    BypassButton = GetModuleOnPanel(Panel, BYPASS_BUTTON_POS)
+    TargetDial = GetModuleOnPanel(Panel, TARGET_DIAL_POS)
+    TextStatusScreen = GetModuleOnPanel(Panel, TEXT_STATUS_SCREEN_POS)
+    GraphicStatusScreen = GetModuleOnPanel(Panel, GRAPHIC_STATUS_SCREEN_POS)
 end
 
 function GetContainerUsage()
     local totalSize = 0;
     local totalUsed = 0;
+    local materialStackSize = MATERIALS[MATERIAL_SYMBOL]["stackSize"]
     for _, container in pairs(Containers) do
         for _, inventory in pairs(container:getInventories()) do
-            totalSize = totalSize + inventory.size * ITEM_STACK_SIZE
+            totalSize = totalSize + inventory.size * materialStackSize
             totalUsed = totalUsed + inventory.itemCount
         end
     end
@@ -95,9 +60,33 @@ function InitStorage()
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
 end
 
+function GetStatus()
+    return {
+        material   = MATERIAL_SYMBOL,
+        storeSize  = StoreSize,
+        numStored  = NumStored,
+        targetNum  = TargetNumStored,
+        isBypassed = IsBypassed
+    }
+end
+
+function InitNetworkUI()
+    if (NIC == nil) then
+        return
+    end
+
+    -- Before we know exactly who to contact, we'll ping and wait for a response from the appropriate controller.
+    -- Note: We'll set NetworkUI with the response sender's address and use that from that point forward.
+    NIC:broadcast(PORT_PING, mp.pack({
+        role = "storage_controller",
+        data = GetStatus()
+    }))
+end
+
 function PrintStorageStatus()
     FractionStored = NumStored / StoreSize
     PercentStored = FractionStored * 100
+    print("Material: "..MATERIAL_SYMBOL.. " ("..MATERIALS[MATERIAL_SYMBOL]["name"]..")")
     print("Usage: "..NumStored.." / "..StoreSize)
     print("Percent: "..tonumber(string.format("%.0f", PercentStored)).."%")
     print("Target Usage: "..TargetNumStored.." / "..StoreSize)
@@ -109,31 +98,28 @@ end
 -- This method should ensure maximum throughput since it will try all 3 outputs before the next Lua step.
 function Transfer()
     for i = 1, SPLITTER_NUM_OUTPUTS do
-        SpitterOutIndex = math.fmod(SpitterOutIndex + 1, SPLITTER_NUM_OUTPUTS)
-        if Splitter:transferItem(SpitterOutIndex) then
+        SplitterOutIndex = math.fmod(SplitterOutIndex + 1, SPLITTER_NUM_OUTPUTS)
+        if Splitter:transferItem(SplitterOutIndex) then
             break
         end
     end
 end
 
-function SetFlowLEDStatus()
-    local color = nil
-    if (IsBypassed and (NumStored >= TargetNumStored)) then
-        color = COLOR_OVERBYPASS
-    elseif (NumStored >= TargetNumStored) then
-        color = COLOR_FLOWING
-    elseif (IsBypassed) then
-        color = COLOR_BYPASSED
-    else
-        color = COLOR_HOLDING
-    end
 
-    FlowLED:setColor(color["r"], color["g"], color["b"], color["a"]);
+function SetIsBypassed(newIsBypassed)
+    IsBypassed = newIsBypassed
+    ValueFileWrite("/primary/data/IsBypassed", IsBypassed)
+    OutputFeedback()
 end
 
 function HandleBypassButtonPush()
-    IsBypassed = not IsBypassed
-    ValueFileWrite("/primary/data/IsBypassed", IsBypassed)
+    SetIsBypassed(not IsBypassed)
+end
+
+function SetTargetPercent(newTargetPercent)
+    TargetPercent = Clamp(newTargetPercent, 0, 100)
+    ValueFileWrite("/primary/data/TargetPercentStored", TargetPercent)
+    TargetNumStored = ComputeTargetNumStored(TargetPercent)
     OutputFeedback()
 end
 
@@ -143,10 +129,45 @@ function HandleTargetDialChange(anticlockwise)
         change = -1 * change
     end
 
-    TargetPercent = Clamp(TargetPercent + change, 0, 100)
-    ValueFileWrite("/primary/data/TargetPercentStored", TargetPercent)
-    TargetNumStored = ComputeTargetNumStored(TargetPercent)
-    OutputFeedback()
+    SetTargetPercent(TargetPercent + change)
+end
+
+function HandleNetworkMessage(eventData)
+    local port = eventData[4]
+    local message = eventData[5]
+    if (port == PORT_PING) then
+        print("Ping message received")
+        -- If a ping response is received, store the sender's address so we can message the UI controller directly from now on.
+        -- Note: But only if the sender's role is set to ui_controller (so we ignore other storage_controller pings).
+        if (message["role"] == "ui_controller") then
+            NetworkUI = eventData[3]
+        end
+    elseif (port == PORT_STORAGE) then
+        print("Storage message received")
+        -- If a storage control signal is received, it *must* come from the registered UI controller to be considered valid.
+        local sender = eventData[3]
+        if (sender ~= NetworkUI) then
+            return
+        end
+
+        if (message["type"] == "SetIsBypassed") then
+            -- SetIsBypassed Handler
+            -- Example: {
+            --     type = "SetIsBypassed",
+            --     data = true   
+            -- }
+            SetIsBypassed(message["data"])
+            print("Bypass updated to "..tostring(IsBypassed))
+        elseif (message["type"] == "SetTargetPercent") then
+            -- SetTarget Handler
+            -- Example: {
+            --     type = "SetTargetPercent",
+            --     data = 85   
+            -- }
+            SetTargetPercent(message["data"])
+            print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
+        end
+    end
 end
 
 function HandleEvents(maxEventsToPop)
@@ -160,7 +181,7 @@ function HandleEvents(maxEventsToPop)
 
         --print("Event: "..eventType)
         if eventType == "Trigger" then
-            -- Toggle IsBypassed
+            -- Toggle IsBypassed when the bypass button is pressed.
             HandleBypassButtonPush()
             print("Bypass updated to "..tostring(IsBypassed))
         elseif eventType == "PotRotate" then
@@ -168,13 +189,10 @@ function HandleEvents(maxEventsToPop)
             local anticlockwise = eventData[3]
             HandleTargetDialChange(anticlockwise)
             print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
+        elseif eventType == "NetworkMessage" then
+            HandleNetworkMessage(eventData)
         end
     end
-end
-
-function ReadInput()
-    -- TODO: Maybe only run this occasionally because it could be expensive...
-    NumStored, StoreSize = GetContainerUsage()
 end
 
 function TransferItems(maxItemsToTransfer)
@@ -194,11 +212,23 @@ function TransferItems(maxItemsToTransfer)
     end
 end
 
-function OutputFeedback()
-    SetFlowLEDStatus()
-    DrawText()
-    DrawGraphics()
-    PrevFeedbackTime = computer.millis()
+function SetBypassButtonStatus()
+    if (BypassButton == nil) then
+        return
+    end
+
+    local color = nil
+    if (IsBypassed and (NumStored >= TargetNumStored)) then
+        color = COLOR_OVERBYPASS
+    elseif (NumStored >= TargetNumStored) then
+        color = COLOR_FLOWING
+    elseif (IsBypassed) then
+        color = COLOR_BYPASSED
+    else
+        color = COLOR_HOLDING
+    end
+
+    BypassButton:setColor(color[1], color[2], color[3], color[4]);
 end
 
 function DrawText()
@@ -208,7 +238,7 @@ function DrawText()
 
     TextStatusScreen.size = 36
     local lines = {
-        " "..ITEM_TYPE.." ("..tonumber(string.format("%.0f", PercentStored)).."%)",
+        " "..MATERIAL_SYMBOL.." ("..tonumber(string.format("%.0f", PercentStored)).."%)",
         " = "..NumStored.." / "..StoreSize,
         " > "..TargetNumStored.." ("..TargetPercent.."%)"
     }
@@ -220,13 +250,17 @@ function DrawGraphics()
         return
     end
 
+    if (GraphicStatusScreen == nil) then
+        return
+    end
+
     -- Point the GPU at the screen we want to render to right now.
     GPU:bindScreen(GraphicStatusScreen)
 
     -- Clear the screen back to black.
     GPU:setBackground(UI_CLEAR_COLOR[1], UI_CLEAR_COLOR[2], UI_CLEAR_COLOR[3], UI_CLEAR_COLOR[4])
     GPU:fill(0, 0, GRAPHIC_STATUS_SCREEN_SIZE["x"], GRAPHIC_STATUS_SCREEN_SIZE["y"], " ", " ")
-    GPU:flush()
+    -- GPU:flush()
 
     -- Draw fill meter.
     local x = 0
@@ -246,8 +280,31 @@ function DrawGraphics()
     GPU:flush()
 end
 
+function NetworkSendStatus()
+    if (NIC == nil) then
+        return
+    end
+
+    if (NetworkUI == nil) then
+        return
+    end
+
+    NIC:send(NetworkUI, PORT_STORAGE, mp.pack({
+        type = "status",
+        data = GetStatus()
+    }))
+end
+
+function OutputFeedback()
+    SetBypassButtonStatus()
+    DrawText()
+    DrawGraphics()
+    NetworkSendStatus()
+    PrevFeedbackTime = computer.millis()
+end
+
 function App()
-    LoadConfig("/primary/app_config.lua")
+    RunFile("/primary/app_config.lua", true, "app config")
     IsBypassed = ValueFileRead("/primary/IsBypassed")
     TargetPercent = ValueFileRead("primary/TargetPercentStored")
     print()
@@ -259,17 +316,30 @@ function App()
     print("Starting...")
     print()
 
-    event.listen(BypassButton)
-    event.listen(TargetDial)
+    if (BypassButton) then
+        event.listen(BypassButton)
+    end
+
+    if (TargetDial) then
+        event.listen(TargetDial)
+    end
+
+    if (NIC) then
+        NIC:open(PORT_PING)
+        NIC:open(PORT_STORAGE)
+        event.listen(NIC)
+        InitNetworkUI()
+    end
 
     while true do
         HandleEvents(MAX_EVENT_HANDLING_RATE)
-        ReadInput()
+        NumStored, StoreSize = GetContainerUsage()
         TransferItems(MAX_ITEM_TRANSFER_RATE)
 
         -- Poll every so many ms to update the UI (but skip this most of the time)
         if (computer.millis() >= PrevFeedbackTime + FEEDBACK_RATE_MS) then
             OutputFeedback()
+            -- print("Tick "..computer.millis())
         end
     end
 end
