@@ -81,7 +81,10 @@ function HandleBypassButtonPush(materialSymbol)
     NIC:send(
         Materials[materialSymbol]["sender"],
         PORT_STORAGE,
-        mp.pack(not Materials[materialSymbol]['IsBypassed'])
+        mp.pack({
+            type = "SetIsBypassed",
+            data = not Materials[materialSymbol]['IsBypassed'])
+        })
     )
 end
 
@@ -100,7 +103,10 @@ function HandleTargetDialChange(materialSymbol, anticlockwise)
     NIC:send(
         Materials[materialSymbol]["sender"],
         PORT_STORAGE,
-        mp.pack(Clamp(Materials[materialSymbol]["targetPercent"] + change, 0, 100))
+        mp.pack({
+            type = "SetTargetPercent",
+            data = Clamp(Materials[materialSymbol]["targetPercent"] + change, 0, 100))
+        })
     )
 end
 
@@ -130,18 +136,18 @@ end
 function HandleNetworkMessage(eventData)
     local sender = eventData[3]
     local port = eventData[4]
-    local message = eventData[5]
+    local message = mp.unpack(eventData[5])
     if (port == PORT_PING) then
         print("Ping message received")
         -- Ingest the storage controller status contained in the message and reply so the storage controller
         -- can register this UI controller as its network UI endpoint. We'll also store the sender so we can
         -- conveniently push control events to them later.
-        if (message["role"] == "storage_controller") then
+        if (message["template"] == "storage_controller") then
             IngestStorageStatus(message["data"])
             local materialSymbol = message["data"]["material"]
             Materials[materialSymbol]["sender"] = sender
             NIC:send(sender, PORT_PING, mp.pack({
-                role = "ui_controller"
+                template = "ui_controller"
             }))
         end
     elseif (port == PORT_STORAGE) then

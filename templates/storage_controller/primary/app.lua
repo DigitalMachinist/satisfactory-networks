@@ -78,7 +78,7 @@ function InitNetworkUI()
     -- Before we know exactly who to contact, we'll ping and wait for a response from the appropriate controller.
     -- Note: We'll set NetworkUI with the response sender's address and use that from that point forward.
     NIC:broadcast(PORT_PING, mp.pack({
-        role = "storage_controller",
+        template = "storage_controller",
         data = GetStatus()
     }))
 end
@@ -133,19 +133,19 @@ function HandleTargetDialChange(anticlockwise)
 end
 
 function HandleNetworkMessage(eventData)
+    local sender = eventData[3]
     local port = eventData[4]
-    local message = eventData[5]
+    local message = mp.unpack(eventData[5])
     if (port == PORT_PING) then
         print("Ping message received")
         -- If a ping response is received, store the sender's address so we can message the UI controller directly from now on.
-        -- Note: But only if the sender's role is set to ui_controller (so we ignore other storage_controller pings).
-        if (message["role"] == "ui_controller") then
-            NetworkUI = eventData[3]
+        -- Note: But only if the sender's template is set to ui_controller (so we ignore other storage_controller pings).
+        if (message["template"] == "ui_controller") then
+            NetworkUI = sender
         end
     elseif (port == PORT_STORAGE) then
         print("Storage message received")
         -- If a storage control signal is received, it *must* come from the registered UI controller to be considered valid.
-        local sender = eventData[3]
         if (sender ~= NetworkUI) then
             return
         end
