@@ -20,7 +20,7 @@ StoreSize = nil       -- The total size of the storage media [0, +inf].
 SplitterOutIndex = 0  -- The index of of the output the splitter last transferred an item to.
 PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
 NetworkUI = nil       -- Address of the network UI that will be handling I/O for this storage system.
-mp = MessagePack()
+JSON = JSON()
 
 function InitComponents()
     GPU = GetGPU(false)
@@ -77,10 +77,12 @@ function InitNetworkUI()
 
     -- Before we know exactly who to contact, we'll ping and wait for a response from the appropriate controller.
     -- Note: We'll set NetworkUI with the response sender's address and use that from that point forward.
-    NIC:broadcast(PORT_PING, mp.pack({
+    local message = JSON.encode({
         template = "storage_controller",
         data = GetStatus()
-    }))
+    })
+    NIC:broadcast(PORT_PING, message)
+    print("[TXB] "..message)
 end
 
 function PrintStorageStatus()
@@ -135,7 +137,8 @@ end
 function HandleNetworkMessage(eventData)
     local sender = eventData[3]
     local port = eventData[4]
-    local message = mp.unpack(eventData[5])
+    local message = JSON.decode(eventData[5])
+    print("[RX] "..eventData[5])
     if (port == PORT_PING) then
         print("Ping message received")
         -- If a ping response is received, store the sender's address so we can message the UI controller directly from now on.
@@ -236,12 +239,13 @@ function DrawText()
         return
     end
 
-    TextStatusScreen.size = 36
     local lines = {
         " "..MATERIAL_SYMBOL.." ("..tonumber(string.format("%.0f", PercentStored)).."%)",
         " = "..NumStored.." / "..StoreSize,
         " > "..TargetNumStored.." ("..TargetPercent.."%)"
     }
+
+    TextStatusScreen.size = 36
     TextStatusScreen.text = table.concat(lines, '\n')
 end
 
@@ -259,14 +263,14 @@ function DrawGraphics()
 
     -- Clear the screen back to black.
     GPU:setBackground(UI_CLEAR_COLOR[1], UI_CLEAR_COLOR[2], UI_CLEAR_COLOR[3], UI_CLEAR_COLOR[4])
-    GPU:fill(0, 0, GRAPHIC_STATUS_SCREEN_SIZE["x"], GRAPHIC_STATUS_SCREEN_SIZE["y"], " ", " ")
+    GPU:fill(0, 0, UI_MODULE_SCREEN_SIZE["x"], UI_MODULE_SCREEN_SIZE["y"], " ", " ")
     -- GPU:flush()
 
     -- Draw fill meter.
     local x = 0
-    local y = math.floor(GRAPHIC_STATUS_SCREEN_SIZE["y"] / 4)
-    local w = GRAPHIC_STATUS_SCREEN_SIZE["x"]
-    local h = GRAPHIC_STATUS_SCREEN_SIZE["y"] / 2
+    local y = math.floor(UI_MODULE_SCREEN_SIZE["y"] / 4)
+    local w = UI_MODULE_SCREEN_SIZE["x"]
+    local h = UI_MODULE_SCREEN_SIZE["y"] / 2
     local targetFraction = TargetPercent / 100
     local targetThickness = 1
     local borderPadding = 2
@@ -289,10 +293,12 @@ function NetworkSendStatus()
         return
     end
 
-    NIC:send(NetworkUI, PORT_STORAGE, mp.pack({
-        type = "status",
+    local message = JSON.encode({
+        type = "StorageStatus",
         data = GetStatus()
-    }))
+    })
+    NIC:send(NetworkUI, PORT_STORAGE, message)
+    print("[TX] "..message)
 end
 
 function OutputFeedback()
@@ -328,8 +334,11 @@ function App()
         NIC:open(PORT_PING)
         NIC:open(PORT_STORAGE)
         event.listen(NIC)
-        InitNetworkUI()
     end
+
+    FlushEventQueue(MAX_EVENT_HANDLING_RATE)
+
+    InitNetworkUI()
 
     while true do
         HandleEvents(MAX_EVENT_HANDLING_RATE)
@@ -339,7 +348,6 @@ function App()
         -- Poll every so many ms to update the UI (but skip this most of the time)
         if (computer.millis() >= PrevFeedbackTime + FEEDBACK_RATE_MS) then
             OutputFeedback()
-            -- print("Tick "..computer.millis())
         end
     end
 end

@@ -7,7 +7,7 @@ Materials = {}
 
 -- State
 PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
-mp = MessagePack()
+JSON = JSON()
 
 function InitMaterialControls(materialSymbol)
     if not CONTROLS[materialSymbol] then
@@ -51,20 +51,18 @@ end
 function RegisterListeners()
     for materialSymbol, control in pairs(Controls) do
         local actionPrefix = nil
-        local bypassButton = control["bypassButton"]
         local bypassButtonPos = Vector2Add(CONTROLS[materialSymbol]["anchorPos"], CONTROL_OFFSET_BYPASS_BUTTON)
-        if bypassButton then
-            event.listen(bypassButton)
+        if Controls[materialSymbol]["bypassButton"] ~= nil then
+            event.listen(Controls[materialSymbol]["bypassButton"])
             actionPrefix = "Listening to"
         else
             actionPrefix = "Missing"
         end
         print(actionPrefix.." bypass button at ("..bypassButtonPos["x"]..","..bypassButtonPos["y"]..") on "..CONTROLS[materialSymbol]["panelName"]..":"..CONTROLS[materialSymbol]["panelIndex"].."!")
 
-        local targetDial = control["targetDial"]
         local targetDialPos = Vector2Add(CONTROLS[materialSymbol]["anchorPos"], CONTROL_OFFSET_TARGET_DIAL)
-        if targetDial then
-            event.listen(targetDial)
+        if Controls[materialSymbol]["targetDial"] ~= nil then
+            event.listen(Controls[materialSymbol]["targetDial"])
             actionPrefix = "Listening to"
         else
             actionPrefix = "Missing"
@@ -73,48 +71,14 @@ function RegisterListeners()
     end
 end
 
-function HandleBypassButtonPush(materialSymbol)
-    if (Materials[materialSymbol] == nil) then
-        return
-    end
-
-    NIC:send(
-        Materials[materialSymbol]["sender"],
-        PORT_STORAGE,
-        mp.pack({
-            type = "SetIsBypassed",
-            data = not Materials[materialSymbol]['IsBypassed'])
-        })
-    )
-end
-
-function HandleTargetDialChange(materialSymbol, anticlockwise)
-    if (Materials[materialSymbol] == nil) then
-        return
-    end
-
-    local change = -TARGET_DIAL_SENSITIVITY
-    if (anticlockwise) then
-        change = -1 * change
-    end
-
-    local targetPercent = math.floor((100 * Materials[materialSymbol]["targetNum"] / Materials[materialSymbol]["storeSize"]) + 0.5)
-
-    NIC:send(
-        Materials[materialSymbol]["sender"],
-        PORT_STORAGE,
-        mp.pack({
-            type = "SetTargetPercent",
-            data = Clamp(Materials[materialSymbol]["targetPercent"] + change, 0, 100))
-        })
-    )
-end
-
-function IngestStorageStatus(messageData)
+function IngestStorageStatus(sender, messageData)
     local materialSymbol = messageData["material"]
     if (Materials[materialSymbol] == nil) then
         Materials[materialSymbol] = {}
     end
+
+    Materials[materialSymbol]["sender"] = sender
+    Materials[materialSymbol]["timestamp"] = computer.millis()
 
     -- Only mark the material as dirty if it has actually changed from the last time its status was provided.
     Materials[materialSymbol]["timeout"] = false
@@ -130,33 +94,82 @@ function IngestStorageStatus(messageData)
     Materials[materialSymbol]["isBypassed"] = messageData["isBypassed"]
     Materials[materialSymbol]["percentStored"] = math.floor((100 * messageData["numStored"] / messageData["storeSize"]) + 0.5)
     Materials[materialSymbol]["targetPercent"] = math.floor((100 * messageData["targetNum"] / messageData["storeSize"]) + 0.5)
-    Materials[materialSymbol]["timestamp"] = computer.millis()
 end
 
 function HandleNetworkMessage(eventData)
     local sender = eventData[3]
     local port = eventData[4]
-    local message = mp.unpack(eventData[5])
+    print("[RX] "..eventData[5])
+    local message = JSON.decode(eventData[5])
     if (port == PORT_PING) then
-        print("Ping message received")
+        -- Ping Handler
         -- Ingest the storage controller status contained in the message and reply so the storage controller
         -- can register this UI controller as its network UI endpoint. We'll also store the sender so we can
         -- conveniently push control events to them later.
+        -- Example: {
+        --     template = "storage_controller",
+        --     data = {
+        --         material   = "CONC",
+        --         storeSize  = 10000,
+        --         numStored  = 6589,
+        --         targetNum  = 7200,
+        --         isBypassed = false,   
+        --     }   
+        -- }
         if (message["template"] == "storage_controller") then
-            IngestStorageStatus(message["data"])
-            local materialSymbol = message["data"]["material"]
-            Materials[materialSymbol]["sender"] = sender
-            NIC:send(sender, PORT_PING, mp.pack({
+            IngestStorageStatus(sender, message["data"])
+            NIC:send(sender, PORT_PING, JSON.encode({
                 template = "ui_controller"
             }))
         end
     elseif (port == PORT_STORAGE) then
-        print("Storage message received")
-        -- Ingest the storage controller status contained in the message.
-        IngestStorageStatus(message["data"])
-        local materialSymbol = message["data"]["material"]
-        Materials[materialSymbol]["sender"] = sender
+        if (message["type"] == "StorageStatus") then
+            -- StorageStatus Handler
+            -- Example: {
+            --     type = "StorageStatus",
+            --     data = {
+            --         material   = "CONC",
+            --         storeSize  = 10000,
+            --         numStored  = 6589,
+            --         targetNum  = 7200,
+            --         isBypassed = false,   
+            --     }   
+            -- }
+            IngestStorageStatus(sender, message["data"])
+        end
     end
+end
+
+function HandleBypassButtonPush(materialSymbol)
+    if (Materials[materialSymbol] == nil) then
+        return
+    end
+
+    local message = JSON.encode({
+        type = "SetIsBypassed",
+        data = not Materials[materialSymbol]["isBypassed"],
+    })
+    NIC:send(Materials[materialSymbol]["sender"], PORT_STORAGE, message)
+    print("[TX] "..message)
+end
+
+function HandleTargetDialChange(materialSymbol, anticlockwise)
+    if (Materials[materialSymbol] == nil) then
+        return
+    end
+
+    local change = -TARGET_DIAL_SENSITIVITY
+    if (anticlockwise) then
+        change = -1 * change
+    end
+
+    local targetPercent = math.floor((100 * Materials[materialSymbol]["targetNum"] / Materials[materialSymbol]["storeSize"]) + 0.5)
+    local message = JSON.encode({
+        type = "SetTargetPercent",
+        data = Clamp(Materials[materialSymbol]["targetPercent"] + change, 0, 100),
+    })
+    NIC:send(Materials[materialSymbol]["sender"], PORT_STORAGE, message)
+    print("[TX] "..message)
 end
 
 function HandleEvents(maxEventsToPop)
@@ -169,23 +182,23 @@ function HandleEvents(maxEventsToPop)
         end
 
         --print("Event: "..eventType)
+        if eventType == "NetworkMessage" then
+            HandleNetworkMessage(eventData)
+            return
+        end
+
+        local materialSymbol = ModuleMap[eventData[2].hash]
         if eventType == "Trigger" then
             -- Toggle IsBypassed
-            local materialSymbol = ModuleMap[eventData[2]]
             if (materialSymbol ~= nil) then
                 HandleBypassButtonPush(materialSymbol)
-                print("Bypass updated to "..tostring(IsBypassed))
             end
         elseif eventType == "PotRotate" then
             -- Update the target number of items to store based on the target dial being rotated.
-            local materialSymbol = ModuleMap[eventData[2]]
             if (materialSymbol ~= nil) then
                 local anticlockwise = eventData[3]
                 HandleTargetDialChange(materialSymbol, anticlockwise)
-                print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
             end
-        elseif eventType == "NetworkMessage" then
-            HandleNetworkMessage(eventData)
         end
     end
 end
@@ -207,14 +220,14 @@ function SetBypassButtonStatus(materialSymbol)
     local timeout = Materials[materialSymbol]["timeout"]
     local isBypassed = Materials[materialSymbol]["isBypassed"]
     local numStored = Materials[materialSymbol]["numStored"]
-    local targetNumStored = Materials[materialSymbol]["targetNumStored"]
+    local targetNumStored = Materials[materialSymbol]["targetNum"]
 
     local color = nil
     if timeout then
         color = COLOR_TIMEOUT
     elseif (isBypassed and (numStored >= targetNumStored)) then
         color = COLOR_OVERBYPASS
-    elseif (NumStored >= targetNumStored) then
+    elseif (numStored >= targetNumStored) then
         color = COLOR_FLOWING
     elseif (isBypassed) then
         color = COLOR_BYPASSED
@@ -237,7 +250,7 @@ function DrawText(materialSymbol)
 
     local timeoutNotice = ""
     if Materials[materialSymbol]["timeout"] then
-        timeoutNotice = " D/Ced"
+        timeoutNotice = "    [D/C]"
     end
 
     local lines = {
@@ -247,7 +260,6 @@ function DrawText(materialSymbol)
     }
 
     textDisplay.size = 36
-    testDisplay.setMonospace(false)
     textDisplay.text = table.concat(lines, '\n')
 end
 
@@ -266,14 +278,14 @@ function DrawGraphics(materialSymbol)
 
     -- Clear the screen back to black.
     GPU:setBackground(UI_CLEAR_COLOR[1], UI_CLEAR_COLOR[2], UI_CLEAR_COLOR[3], UI_CLEAR_COLOR[4])
-    GPU:fill(0, 0, GRAPHIC_STATUS_SCREEN_SIZE["x"], GRAPHIC_STATUS_SCREEN_SIZE["y"], " ", " ")
+    GPU:fill(0, 0, UI_MODULE_SCREEN_SIZE["x"], UI_MODULE_SCREEN_SIZE["y"], " ", " ")
     -- GPU:flush() 
 
     -- Draw fill meter.
     local x = 0
-    local y = math.floor(GRAPHIC_STATUS_SCREEN_SIZE["y"] / 4)
-    local w = GRAPHIC_STATUS_SCREEN_SIZE["x"]
-    local h = GRAPHIC_STATUS_SCREEN_SIZE["y"] / 2
+    local y = math.floor(UI_MODULE_SCREEN_SIZE["y"] / 4)
+    local w = UI_MODULE_SCREEN_SIZE["x"]
+    local h = UI_MODULE_SCREEN_SIZE["y"] / 2
     local storedFraction = Materials[materialSymbol]["percentStored"] / 100
     local targetFraction = Materials[materialSymbol]["targetPercent"] / 100
     local targetThickness = 1
@@ -323,6 +335,8 @@ function App()
     NIC:open(PORT_STORAGE)
     event.listen(NIC)
 
+    FlushEventQueue(MAX_EVENT_HANDLING_RATE)
+
     while true do
         HandleEvents(MAX_EVENT_HANDLING_RATE)
 
@@ -331,8 +345,8 @@ function App()
         if (computer.millis() >= PrevFeedbackTime + FEEDBACK_RATE_MS) then
             DetectTimeouts()
             OutputFeedback(true)
-        else
-            OutputFeedback(false)
+        -- else
+        --     OutputFeedback(false)
         end
     end
 end
