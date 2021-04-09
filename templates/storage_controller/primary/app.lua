@@ -20,7 +20,6 @@ StoreSize = nil       -- The total size of the storage media [0, +inf].
 SplitterOutIndex = 0  -- The index of of the output the splitter last transferred an item to.
 PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
 NetworkUI = nil       -- Address of the network UI that will be handling I/O for this storage system.
-JSON = JSON()
 
 function InitComponents()
     GPU = GetGPU(false)
@@ -58,31 +57,6 @@ function InitStorage()
     IsBypassed = ValueFileRead("/primary/data/IsBypassed") == "true"
     TargetPercent = tonumber(ValueFileRead("/primary/data/TargetPercentStored"))
     TargetNumStored = ComputeTargetNumStored(TargetPercent)
-end
-
-function GetStatus()
-    return {
-        material   = MATERIAL_SYMBOL,
-        storeSize  = StoreSize,
-        numStored  = NumStored,
-        targetNum  = TargetNumStored,
-        isBypassed = IsBypassed
-    }
-end
-
-function InitNetworkUI()
-    if (NIC == nil) then
-        return
-    end
-
-    -- Before we know exactly who to contact, we'll ping and wait for a response from the appropriate controller.
-    -- Note: We'll set NetworkUI with the response sender's address and use that from that point forward.
-    local message = JSON.encode({
-        template = "storage_controller",
-        data = GetStatus()
-    })
-    NIC:broadcast(PORT_PING, message)
-    print("[TXB] "..message)
 end
 
 function PrintStorageStatus()
@@ -137,37 +111,49 @@ end
 function HandleNetworkMessage(eventData)
     local sender = eventData[3]
     local port = eventData[4]
-    local message = JSON.decode(eventData[5])
-    print("[RX] "..eventData[5])
     if (port == PORT_PING) then
-        print("Ping message received")
-        -- If a ping response is received, store the sender's address so we can message the UI controller directly from now on.
-        -- Note: But only if the sender's template is set to ui_controller (so we ignore other storage_controller pings).
-        if (message["template"] == "ui_controller") then
-            NetworkUI = sender
+        -- If a ping is received, store the sender's address so we can message the UI controller directly from now on.
+        local ping = ParseUiPing(eventData)
+        print("[RX] PING: "..ping["template"].." from "..sender)
+
+        if (ping["template"] ~= "ui_controller") then
+            return
         end
+
+        NetworkUI = sender
+        NIC:send(NetworkUI, PORT_PONG, StoragePong())
+        print("[TX] PONG")
+    elseif (port == PORT_PONG) then
+        -- If a ping response is received, store the sender's address so we can message the UI controller directly from now on.
+        local pong = ParseUiPong(eventData)
+        print("[RX] PONG: "..pong["template"].." from "..sender)
+
+        if (pong["template"] ~= "ui_controller") then
+            return
+        end
+
+        NetworkUI = sender
     elseif (port == PORT_STORAGE) then
-        print("Storage message received")
+        -- Handle storage control signals
+        local type = eventData[5]
+        print("[RX] STORAGE: "..type.." from "..sender)
+
         -- If a storage control signal is received, it *must* come from the registered UI controller to be considered valid.
         if (sender ~= NetworkUI) then
             return
         end
-
-        if (message["type"] == "SetIsBypassed") then
-            -- SetIsBypassed Handler
-            -- Example: {
-            --     type = "SetIsBypassed",
-            --     data = true   
-            -- }
-            SetIsBypassed(message["data"])
+        print('aaaaa')
+        
+        if (type == "SetIsBypassed") then
+            print('bb')
+            -- Handle control signal to toggle the bypass on or off.
+            local message = ParseUiSetIsBypassed(eventData)
+            SetIsBypassed(message["value"])
             print("Bypass updated to "..tostring(IsBypassed))
-        elseif (message["type"] == "SetTargetPercent") then
-            -- SetTarget Handler
-            -- Example: {
-            --     type = "SetTargetPercent",
-            --     data = 85   
-            -- }
-            SetTargetPercent(message["data"])
+        elseif (type == "SetTarget") then
+            -- Handle control signal to set the target number of items stored.
+            local message = ParseUiSetTarget(eventData)
+            SetTargetPercent(message["value"])
             print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
         end
     end
@@ -183,7 +169,9 @@ function HandleEvents(maxEventsToPop)
         end
 
         --print("Event: "..eventType)
-        if eventType == "Trigger" then
+        if eventType == "NetworkMessage" then
+            HandleNetworkMessage(eventData)
+        elseif eventType == "Trigger" then
             -- Toggle IsBypassed when the bypass button is pressed.
             HandleBypassButtonPush()
             print("Bypass updated to "..tostring(IsBypassed))
@@ -192,8 +180,6 @@ function HandleEvents(maxEventsToPop)
             local anticlockwise = eventData[3]
             HandleTargetDialChange(anticlockwise)
             print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
-        elseif eventType == "NetworkMessage" then
-            HandleNetworkMessage(eventData)
         end
     end
 end
@@ -258,13 +244,8 @@ function DrawGraphics()
         return
     end
 
-    -- Point the GPU at the screen we want to render to right now.
-    GPU:bindScreen(GraphicStatusScreen)
-
-    -- Clear the screen back to black.
-    GPU:setBackground(UI_CLEAR_COLOR[1], UI_CLEAR_COLOR[2], UI_CLEAR_COLOR[3], UI_CLEAR_COLOR[4])
-    GPU:fill(0, 0, UI_MODULE_SCREEN_SIZE["x"], UI_MODULE_SCREEN_SIZE["y"], " ", " ")
-    -- GPU:flush()
+    -- Clear the screen back to black (this also binds the display to the GPU so we don't need to do that).
+    ClearGraphicDisplay(GPU, GraphicStatusScreen, UI_CLEAR_COLOR, false)
 
     -- Draw fill meter.
     local x = 0
@@ -293,12 +274,8 @@ function NetworkSendStatus()
         return
     end
 
-    local message = JSON.encode({
-        type = "StorageStatus",
-        data = GetStatus()
-    })
-    NIC:send(NetworkUI, PORT_STORAGE, message)
-    print("[TX] "..message)
+    NIC:send(NetworkUI, PORT_STORAGE, StorageStatus())
+    print("[TX] STORAGE: StorageStatus "..NumStored.."/"..StoreSize)
 end
 
 function OutputFeedback()
@@ -311,6 +288,8 @@ end
 
 function App()
     RunFile("/primary/app_config.lua", true, "app config")
+    RunFile("/primary/env_config.lua", true, "env config")
+    LoadLibrariesRecursive("/primary/src")
     IsBypassed = ValueFileRead("/primary/IsBypassed")
     TargetPercent = ValueFileRead("primary/TargetPercentStored")
     print()
@@ -322,15 +301,15 @@ function App()
     print("Starting...")
     print()
 
-    if (BypassButton) then
+    if BypassButton then
         event.listen(BypassButton)
     end
 
-    if (TargetDial) then
+    if TargetDial then
         event.listen(TargetDial)
     end
 
-    if (NIC) then
+    if NIC then
         NIC:open(PORT_PING)
         NIC:open(PORT_STORAGE)
         event.listen(NIC)
@@ -338,7 +317,9 @@ function App()
 
     FlushEventQueue(MAX_EVENT_HANDLING_RATE)
 
-    InitNetworkUI()
+    if NIC then
+        NIC:broadcast(PORT_PING, StoragePing())
+    end
 
     while true do
         HandleEvents(MAX_EVENT_HANDLING_RATE)

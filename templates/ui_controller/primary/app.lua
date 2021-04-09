@@ -7,7 +7,6 @@ Materials = {}
 
 -- State
 PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
-JSON = JSON()
 
 function InitMaterialControls(materialSymbol)
     if not CONTROLS[materialSymbol] then
@@ -19,7 +18,7 @@ function InitMaterialControls(materialSymbol)
     local panel = GetComponentByNick(control["panelName"])
 
     -- Look up each of the control modules and return them as a table.
-    return {
+    local controls = {
         materialSymbol = materialSymbol,
         panel          = panel,
         textDisplay    = GetModuleOnPanel(panel, Vector2Add(control["anchorPos"], CONTROL_OFFSET_TEXT_DISPLAY), control["panelIndex"]),
@@ -27,6 +26,19 @@ function InitMaterialControls(materialSymbol)
         bypassButton   = GetModuleOnPanel(panel, Vector2Add(control["anchorPos"], CONTROL_OFFSET_BYPASS_BUTTON), control["panelIndex"]),
         targetDial     = GetModuleOnPanel(panel, Vector2Add(control["anchorPos"], CONTROL_OFFSET_TARGET_DIAL), control["panelIndex"]),
     }
+
+    -- Clear any previous displayed values until new ones are provided by the storage controller.
+    if (controls["bypassButton"] ~= nil) then
+        controls["bypassButton"]:setColor(COLOR_TIMEOUT[1], COLOR_TIMEOUT[2], COLOR_TIMEOUT[3], COLOR_TIMEOUT[4])
+    end
+    if (controls["textDisplay"] ~= nil) then
+        controls["textDisplay"].text = ""
+    end
+    if (controls["graphicDisplay"] ~= nil) then
+        ClearGraphicDisplay(GPU, graphicDisplay, UI_CLEAR_COLOR, true)
+    end
+
+    return controls
 end
 
 function InitComponents()
@@ -71,90 +83,83 @@ function RegisterListeners()
     end
 end
 
-function IngestStorageStatus(sender, messageData)
-    local materialSymbol = messageData["material"]
+function IngestStorageStatus(message)
+    local materialSymbol = message["material"]
     if (Materials[materialSymbol] == nil) then
         Materials[materialSymbol] = {}
     end
 
-    Materials[materialSymbol]["sender"] = sender
+    Materials[materialSymbol]["sender"] = message["sender"]
     Materials[materialSymbol]["timestamp"] = computer.millis()
 
     -- Only mark the material as dirty if it has actually changed from the last time its status was provided.
     Materials[materialSymbol]["timeout"] = false
-    Materials[materialSymbol]["isDirty"] = Materials[materialSymbol]["storeSize"] ~= messageData["storeSize"]
-                                        or Materials[materialSymbol]["numStored"] ~= messageData["numStored"]
-                                        or Materials[materialSymbol]["targetNum"] ~= messageData["targetNum"]
-                                        or Materials[materialSymbol]["isIypassed"] ~= messageData["isBypassed"]
+    Materials[materialSymbol]["isDirty"] = Materials[materialSymbol]["storeSize"] ~= message["storeSize"]
+                                        or Materials[materialSymbol]["numStored"] ~= message["numStored"]
+                                        or Materials[materialSymbol]["targetNum"] ~= message["targetNum"]
+                                        or Materials[materialSymbol]["isIypassed"] ~= message["isBypassed"]
 
-    Materials[materialSymbol]["symbol"] = messageData["material"]
-    Materials[materialSymbol]["storeSize"] = messageData["storeSize"]
-    Materials[materialSymbol]["numStored"] = messageData["numStored"]
-    Materials[materialSymbol]["targetNum"] = messageData["targetNum"]
-    Materials[materialSymbol]["isBypassed"] = messageData["isBypassed"]
-    Materials[materialSymbol]["percentStored"] = math.floor((100 * messageData["numStored"] / messageData["storeSize"]) + 0.5)
-    Materials[materialSymbol]["targetPercent"] = math.floor((100 * messageData["targetNum"] / messageData["storeSize"]) + 0.5)
+    Materials[materialSymbol]["symbol"] = message["material"]
+    Materials[materialSymbol]["storeSize"] = message["storeSize"]
+    Materials[materialSymbol]["numStored"] = message["numStored"]
+    Materials[materialSymbol]["targetNum"] = message["targetNum"]
+    Materials[materialSymbol]["isBypassed"] = message["isBypassed"]
+    Materials[materialSymbol]["percentStored"] = math.floor((100 * message["numStored"] / message["storeSize"]) + 0.5)
+    Materials[materialSymbol]["targetPercent"] = math.floor((100 * message["targetNum"] / message["storeSize"]) + 0.5)
 end
 
 function HandleNetworkMessage(eventData)
     local sender = eventData[3]
     local port = eventData[4]
-    print("[RX] "..eventData[5])
-    local message = JSON.decode(eventData[5])
     if (port == PORT_PING) then
-        -- Ping Handler
-        -- Ingest the storage controller status contained in the message and reply so the storage controller
-        -- can register this UI controller as its network UI endpoint. We'll also store the sender so we can
-        -- conveniently push control events to them later.
-        -- Example: {
-        --     template = "storage_controller",
-        --     data = {
-        --         material   = "CONC",
-        --         storeSize  = 10000,
-        --         numStored  = 6589,
-        --         targetNum  = 7200,
-        --         isBypassed = false,   
-        --     }   
-        -- }
-        if (message["template"] == "storage_controller") then
-            IngestStorageStatus(sender, message["data"])
-            NIC:send(sender, PORT_PING, JSON.encode({
-                template = "ui_controller"
-            }))
+        -- Handle pings from storage controllers by ingesting their status and registering them.
+        -- We also reply directly to the sender so they can register this as their UI controller.
+        local ping = ParseStoragePing(eventData)
+        print("[RX] PING: "..ping["template"].." from "..sender)
+
+        if (ping["template"] ~= "storage_controller") then
+            return
         end
+
+        IngestStorageStatus(ping)
+        NIC:send(sender, PORT_PING, UiPong())
+        print("[TX] PONG")
+    elseif (port == PORT_PONG) then
+        -- Handle pings from storage controllers by ingesting their status and registering them.
+        local pong = ParseStoragePong(eventData)
+        print("[RX] PONG: "..ping["template"].." from "..sender)
+
+        if (pong["template"] ~= "storage_controller") then
+            return
+        end
+
+        IngestStorageStatus(pong)
     elseif (port == PORT_STORAGE) then
+        -- Handle storage status updates
+        local message = ParseStorageStatus(eventData)
+        print("[RX] MESSAGE: "..message["type"].." from "..sender)
+
         if (message["type"] == "StorageStatus") then
-            -- StorageStatus Handler
-            -- Example: {
-            --     type = "StorageStatus",
-            --     data = {
-            --         material   = "CONC",
-            --         storeSize  = 10000,
-            --         numStored  = 6589,
-            --         targetNum  = 7200,
-            --         isBypassed = false,   
-            --     }   
-            -- }
-            IngestStorageStatus(sender, message["data"])
+            -- Handle storage status updates by ingesting the data and updating the UI.
+            IngestStorageStatus(message)
         end
     end
 end
 
 function HandleBypassButtonPush(materialSymbol)
-    if (Materials[materialSymbol] == nil) then
+    local material = Materials[materialSymbol]
+    if (material == nil) then
         return
     end
 
-    local message = JSON.encode({
-        type = "SetIsBypassed",
-        data = not Materials[materialSymbol]["isBypassed"],
-    })
-    NIC:send(Materials[materialSymbol]["sender"], PORT_STORAGE, message)
-    print("[TX] "..message)
+    local newIsBypassed = not material["isBypassed"]
+    NIC:send(material["sender"], PORT_STORAGE, UiSetIsBypassed(newIsBypassed))
+    print("[TX] STORAGE: SetIsBypassed on "..material["sender"])
 end
 
 function HandleTargetDialChange(materialSymbol, anticlockwise)
-    if (Materials[materialSymbol] == nil) then
+    local material = Materials[materialSymbol]
+    if (material == nil) then
         return
     end
 
@@ -163,13 +168,10 @@ function HandleTargetDialChange(materialSymbol, anticlockwise)
         change = -1 * change
     end
 
-    local targetPercent = math.floor((100 * Materials[materialSymbol]["targetNum"] / Materials[materialSymbol]["storeSize"]) + 0.5)
-    local message = JSON.encode({
-        type = "SetTargetPercent",
-        data = Clamp(Materials[materialSymbol]["targetPercent"] + change, 0, 100),
-    })
-    NIC:send(Materials[materialSymbol]["sender"], PORT_STORAGE, message)
-    print("[TX] "..message)
+    local targetPercent = math.floor((100 * material["targetNum"] / material["storeSize"]) + 0.5)
+    local newTargetPercent = Clamp(material["targetPercent"] + change, 0, 100)
+    NIC:send(material["sender"], PORT_STORAGE, UiSetTarget(newTargetPercent))
+    print("[TX] STORAGE: SetTarget "..newTargetPercent.." on "..material["sender"])
 end
 
 function HandleEvents(maxEventsToPop)
@@ -273,13 +275,8 @@ function DrawGraphics(materialSymbol)
         return
     end
 
-    -- Point the GPU at the screen we want to render to right now.
-    GPU:bindScreen(graphicDisplay)
-
-    -- Clear the screen back to black.
-    GPU:setBackground(UI_CLEAR_COLOR[1], UI_CLEAR_COLOR[2], UI_CLEAR_COLOR[3], UI_CLEAR_COLOR[4])
-    GPU:fill(0, 0, UI_MODULE_SCREEN_SIZE["x"], UI_MODULE_SCREEN_SIZE["y"], " ", " ")
-    -- GPU:flush() 
+    -- Clear the screen back to black (this also binds the display to the GPU so we don't need to do that).
+    ClearGraphicDisplay(GPU, graphicDisplay, UI_CLEAR_COLOR, false)
 
     -- Draw fill meter.
     local x = 0
@@ -324,6 +321,8 @@ end
 
 function App()
     RunFile("/primary/app_config.lua", true, "app config")
+    RunFile("/primary/env_config.lua", true, "env config")
+    LoadLibrariesRecursive("/primary/src")
     print()
     InitComponents()
     print()
@@ -336,6 +335,8 @@ function App()
     event.listen(NIC)
 
     FlushEventQueue(MAX_EVENT_HANDLING_RATE)
+
+    NIC:broadcast(PORT_PING, UiPing())
 
     while true do
         HandleEvents(MAX_EVENT_HANDLING_RATE)

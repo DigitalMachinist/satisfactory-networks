@@ -9,10 +9,11 @@ SPLITTER_NUM_OUTPUTS   = 3
 UI_MODULE_SCREEN_SIZE = { x = 119, y = 30 }
 
 -- Utility ports
-PORT_ALERTS  = 0
 PORT_LOGS    = 1
 PORT_STORAGE = 2
 PORT_PING    = 3
+PORT_PONG    = 4
+PORT_ALERTS  = 5
 
 -- Materials
 MATERIALS = {

@@ -35,11 +35,13 @@ do
     for DRIVE in $DRIVES
     do
         printf "Updating drive ${RED}$DRIVE${NC} from template ${GREEN}$1/$ALIAS${NC}...\n"
-        find "./$DRIVE" -mindepth 1 \( -not -path '*/data*' \) -delete # Delete all but the data folder.
+        find "./$DRIVE" -mindepth 1 \( ! -path "*/data*" ! -path "*/env_config.lua" ! -path "*/README.md" \) -delete # Delete all but the data folder, env_config.lua and README.md.
         DIR_DEST="$DIR_DRIVES/$DRIVE"
         cp -rf $DIR_TEMPLATE/$ALIAS/* "$DIR_DEST"
         cp -rf "$DIR_SCRIPT/../libraries" "$DIR_DEST"
         cp "$DIR_SCRIPT/../eeprom.lua" "$DIR_DEST"
+        touch "$DIR_DEST/env_config.lua"
+        touch "$DIR_DEST/README.md"
 
         # If this is a primary drive and eeprom.lua exists, rewrite {DRIVE_UUID_PRIMARY} to the drive's UUID.
         if [ $ALIAS = "primary" ]; then

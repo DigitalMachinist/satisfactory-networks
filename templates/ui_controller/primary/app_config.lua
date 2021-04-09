@@ -1,4 +1,6 @@
--- The important stuff
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+-- Overwrite these in env_config.lua ----------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------------------
 FEEDBACK_RATE_MS        = 500       -- How many ms between updates of the UI?
 TIMEOUT_PERIOD_MS       = 10000     -- How many ms without any updates for a storage unit until we mark is as timed out?
 MAX_EVENT_HANDLING_RATE = 3         -- Max number of events that can be handled per-lua-tick.
@@ -10,6 +12,7 @@ CONTROLS = {                        -- Map {material symbol} => {panel & anchor 
         anchorPos  = Vector2(1, 10),
     },
 }
+-----------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Offsets (from an anchor position on a panel)
 CONTROL_OFFSET_TEXT_DISPLAY    = Vector2(0, 0)
