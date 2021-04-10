@@ -34,10 +34,10 @@ function ProgressBar(gpu, fraction, x, y, w, h, bgColor, fgColor, borderPadding,
             targetColor = { 1, 1, 1, 1 }
         end
 
-        local xTargetOffset = ix + math.ceil(iw * targetFraction)
-        local clampedTargetOffset = math.max(0, math.min(iw - targetThickness + 1, xTargetOffset))
+        local xTarget = ix + math.ceil(iw * targetFraction)
+        local xClampedTarget = math.max(0, math.min(iw - targetThickness + 1, xTarget))
         gpu:setBackground(targetColor[1], targetColor[2], targetColor[3], targetColor[4])
-        gpu:fill(ix + clampedTargetOffset, iy, targetThickness, ih, " ", " ")
+        gpu:fill(xClampedTarget, iy, targetThickness, ih, " ", " ")
     end
 
     -- Draw border.
