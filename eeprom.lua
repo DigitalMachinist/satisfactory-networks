@@ -137,10 +137,10 @@ function LoadLibrariesRecursive(dirpath)
         else
             -- Only load *.lua files
             if path:sub(-4) == ".lua" then
-                print(i..". "..path.."...")
+                --print(i..". "..path.."...")
                 fs.doFile(path)
             else
-                print(i..". "..path.." (non-Lua) skipped...")
+                --print(i..". "..path.." (non-Lua) skipped...")
             end
         end
     end
