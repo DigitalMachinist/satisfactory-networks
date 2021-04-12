@@ -5,3 +5,6 @@ backup
 drives/*/*
 !drives/*/tags
 !drives/*/data
+
+# Material map Excel lockfile
+"~\$Material Map.xlsx"
