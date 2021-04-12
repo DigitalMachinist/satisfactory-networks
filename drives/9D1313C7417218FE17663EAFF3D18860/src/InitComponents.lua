@@ -1,0 +1,11 @@
+function InitComponents()
+    GPU = GetGPU(false)
+    NIC = GetNIC(false)
+    Containers = GetComponentsByNick(CONTAINER_NAME)
+    Splitter = GetComponentByNick(SPLITTER_NAME)
+    Panel = GetComponentByNick(PANEL_NAME)
+    BypassButton = GetModuleOnPanel(Panel, BYPASS_BUTTON_POS)
+    TargetDial = GetModuleOnPanel(Panel, TARGET_DIAL_POS)
+    TextStatusScreen = GetModuleOnPanel(Panel, TEXT_STATUS_SCREEN_POS)
+    GraphicStatusScreen = GetModuleOnPanel(Panel, GRAPHIC_STATUS_SCREEN_POS)
+end

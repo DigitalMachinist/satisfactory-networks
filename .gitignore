@@ -1,10 +1,10 @@
 backup
 
 # Ignore drives but leave any tags & data in each drive.
-!drives/
-drives/*/*
-!drives/*/tags
-!drives/*/data
+# !drives/
+# drives/*/*
+# !drives/*/tags
+# !drives/*/data
 
 # Material map Excel lockfile
 "~\$Material Map.xlsx"
