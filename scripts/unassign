@@ -1,0 +1,37 @@
+#!/bin/bash
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+if [ -z "$1" ]; then
+    echo "Missing arguments!"
+    echo "Usage: ./unassign <drive_uuid> [<drive_uuid>]...";
+    exit 1
+fi
+
+ASSIGNED_PATH="$SCRIPT_DIR/../assigned_drives"
+if [ ! -d "$ASSIGNED_PATH" ]; then
+    echo "Done!"
+    exit 0
+fi
+
+for DRIVE in "${@:1}"
+do
+    # If this drive was not assigned to a template, continue to the next one.
+    if [ ! -f "$SCRIPT_DIR/../drives/$DRIVE/.template" ]; then
+        printf "Drive ${RED}$DRIVE${NC} is not assigned to a template.\n"
+        continue
+    fi
+    
+    TEMPLATE=$( cat "$SCRIPT_DIR/../drives/$DRIVE/.template" )
+    rm "$SCRIPT_DIR/../drives/$DRIVE/.template"
+    rm "$ASSIGNED_PATH/$TEMPLATE/$DRIVE"
+    
+    printf "Unassigned drive ${RED}$DRIVE${NC} from template ${GREEN}$TEMPLATE${NC}.\n"
+done
+
+echo "Done!"
