@@ -1,0 +1,54 @@
+#!/bin/bash
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+cmd() {
+    CMD=$1
+    shift;
+    ARGS=$@
+    WIN_PWD=`wslpath -w "$(pwd)"`
+    cmd.exe /c "pushd ${WIN_PWD} && ${CMD} ${ARGS}"
+}
+
+PWD=$( pwd )
+WIN_SCRIPT_DIR=$( wslpath -w "$(pwd)" )
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+ASSIGNED_PATH="$SCRIPT_DIR/../assigned_drives"
+DRIVES_PATH="$SCRIPT_DIR/../drives"
+
+# Cleaned out all symlinks in the assigned_drives folder.
+rm -rf "$ASSIGNED_PATH/*"
+echo "Cleaned out the assigned_drives folder."
+
+# Reassign each drive based on its .template file to rebuild the assigned_drives symlink folder.
+cd $DRIVES_PATH
+DRIVES="$( find . -mindepth 1 -maxdepth 1 -type d | sort -u | cut -c3-34 )"
+for DRIVE in $DRIVES
+do
+    if [ -f "$DRIVES_PATH/$DRIVE/.template" ]; then
+        TEMPLATE=$( cat "$DRIVES_PATH/$DRIVE/.template" )
+    else
+        TEMPLATE="unassigned"
+    fi
+
+    if [ ! -d "$ASSIGNED_PATH/$TEMPLATE" ]; then
+        mkdir "$ASSIGNED_PATH/$TEMPLATE"
+    fi
+
+    cmd mklink /D "$WIN_SCRIPT_DIR\\..\\assigned_drives\\$TEMPLATE\\$DRIVE" "$WIN_SCRIPT_DIR\\..\\drives\\$DRIVE" > /dev/null 2>&1
+    # I don't do this because my editor is running under my Windows filesystem, so I needs a Windows symlink.
+    # ln -sf "$SCRIPT_DIR/../drives/$DRIVE" "$ASSIGNED_PATH/$TEMPLATE/$DRIVE"
+
+    if [ "$TEMPLATE" = "unassigned" ]; then
+        printf "Drive ${RED}$DRIVE${NC} unassigned.\n"
+    else
+        printf "Assigned drive ${RED}$DRIVE${NC} to template ${GREEN}$TEMPLATE${NC}.\n"
+    fi
+done
+
+cd $PWD
+
+echo "Done!"
