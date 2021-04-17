@@ -1,30 +1,34 @@
 #!/bin/bash
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
+###################################################################################################
+# reassignall
+#
+# Updates the /assigned_drives folder by checking the assigned template of all drives and placing
+# each one into the appropriate template folder.
+#
+# This script is useful if your /assigned_drives folder gets deleted or modified somehow and you
+# just need to fix it for all drives. It also automatically runs after each `pull` to sort any
+# newly discovered drives into /assigned_drives/unassigned by default.
+###################################################################################################
 
-cmd() {
-    CMD=$1
-    shift;
-    ARGS=$@
-    WIN_PWD=`wslpath -w "$(pwd)"`
-    cmd.exe /c "pushd ${WIN_PWD} && ${CMD} ${ARGS}"
-}
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../scripts_config"
 
-PWD=$( pwd )
-WIN_SCRIPT_DIR=$( wslpath -w "$(pwd)" )
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-ASSIGNED_PATH="$SCRIPT_DIR/../assigned_drives"
-DRIVES_PATH="$SCRIPT_DIR/../drives"
+DRIVES_PATH="$FIN_SDK_PATH/drives"
+ASSIGNED_DRIVES_PATH="$FIN_SDK_PATH/assigned_drives"
+if [ ! -d "$ASSIGNED_DRIVES_PATH" ]; then
+    mkdir "$ASSIGNED_DRIVES_PATH"
+fi
 
-# Cleaned out all symlinks in the assigned_drives folder.
-rm -rf "$ASSIGNED_PATH/*"
-echo "Cleaned out the assigned_drives folder."
+# Delete all existing /assigned_drives subfolders and symlinks.
+# This just removes the links, not the actual files.
+rm -rf "$ASSIGNED_DRIVES_PATH/*"
+
+# While changing to the /drives folder, get the path to use for Windows symlinking.
+cd "$DRIVES_PATH"
+WIN_DRIVES_PATH=$( cmdpwd )
 
 # Reassign each drive based on its .template file to rebuild the assigned_drives symlink folder.
-cd $DRIVES_PATH
 DRIVES="$( find . -mindepth 1 -maxdepth 1 -type d | sort -u | cut -c3-34 )"
 for DRIVE in $DRIVES
 do
@@ -34,13 +38,19 @@ do
         TEMPLATE="unassigned"
     fi
 
-    if [ ! -d "$ASSIGNED_PATH/$TEMPLATE" ]; then
-        mkdir "$ASSIGNED_PATH/$TEMPLATE"
+    if [ ! -d "$ASSIGNED_DRIVES_PATH/$TEMPLATE" ]; then
+        mkdir "$ASSIGNED_DRIVES_PATH/$TEMPLATE"
     fi
 
-    cmd mklink /D "$WIN_SCRIPT_DIR\\..\\assigned_drives\\$TEMPLATE\\$DRIVE" "$WIN_SCRIPT_DIR\\..\\drives\\$DRIVE" > /dev/null 2>&1
-    # I don't do this because my editor is running under my Windows filesystem, so I needs a Windows symlink.
-    # ln -sf "$SCRIPT_DIR/../drives/$DRIVE" "$ASSIGNED_PATH/$TEMPLATE/$DRIVE"
+    # Symlink the drive into the /assigned_drives subfolder for its template. This makes it so that any
+    # changes to the copy under /assigned_drives is automatically reflected in the copy under /drives.
+    if [ "$SYMLINK_FOR_WINDOWS" -eq 1 ]; then
+        # Use Windows symlinking if requested.
+        cmdrun mklink /D "$WIN_DRIVES_PATH\\..\\assigned_drives\\$TEMPLATE\\$DRIVE" "$WIN_DRIVES_PATH\\$DRIVE" >/dev/null 2>&1
+    else
+        # Otherwise, use *nix symlinking instead.
+        ln -sf "$DRIVES_PATH/$DRIVE" "$ASSIGNED_DRIVES_PATH/$TEMPLATE/$DRIVE"
+    fi
 
     if [ "$TEMPLATE" = "unassigned" ]; then
         printf "Drive ${RED}$DRIVE${NC} unassigned.\n"
@@ -48,6 +58,7 @@ do
         printf "Assigned drive ${RED}$DRIVE${NC} to template ${GREEN}$TEMPLATE${NC}.\n"
     fi
 done
+printf "\n"
 
 cd $PWD
 

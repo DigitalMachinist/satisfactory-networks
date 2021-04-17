@@ -1,0 +1,50 @@
+#!/bin/bash
+
+###################################################################################################
+# pull
+#
+# Update the FIN SDK drives folder with any new drives found in your FIN computers folder.
+#
+# This will *only* overwrite the contents of each drive's /data folder. It does this to ensure
+# that any persistent data saved to each drive during gameplay will be preserved.
+# Everything else should be code.
+#
+# After new drives are discovered, all drives will automatically be `reassign`ed so any new drives
+# appear in /assigned_drives/unassigned. Existing drives that have been assigned template already
+# will be unchanged.
+###################################################################################################
+
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../scripts_config"
+
+# Discover drives from FIN computers folder.
+cd "$FIN_COMPUTERS_PATH"
+printf "Discovering drives from:\n"
+printf "  ╰──▶ ${GREEN}$FIN_COMPUTERS_PATH${NC}\n\n"
+DRIVES="$( find . -mindepth 1 -maxdepth 1 -type d | sort -u | cut -c3-34 )"
+for DRIVE in $DRIVES
+do
+    DRIVE_PATH="$FIN_SDK_PATH/drives/$DRIVE"
+    if [ -d "$DRIVE_PATH" ]; then
+        printf "Found existing drive ${RED}$DRIVE${NC}.\n"
+    else
+        printf "Discovered new drive ${GREEN}$DRIVE${NC}!\n"
+        mkdir "$FIN_SDK_PATH/drives/$DRIVE" >/dev/null 2>&1
+    fi
+    mkdir "$DRIVE_PATH/tags" >/dev/null 2>&1
+    touch "$DRIVE_PATH/tags/.gitkeep"
+    mkdir "$DRIVE_PATH/data" >/dev/null 2>&1
+    touch "$DRIVE_PATH/data/.gitkeep"
+    cp -rf "$DRIVE/data/*" "$DRIVE_PATH/data" >/dev/null 2>&1
+done
+printf "\n"
+
+cd $PWD
+
+# Reassign all to move any newly discovered drives into the "unassigned" list.
+printf "Reassigning drives:\n"
+printf "  ╰──▶ ${GREEN}$FIN_SDK_PATH/assigned_drives${NC}\n\n"
+"$FIN_SDK_PATH/scripts/reassignall"
+
+# Not needed since reassignall prints it for us.
+# echo "Done!"

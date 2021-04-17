@@ -1,51 +1,57 @@
 #!/bin/bash
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
+###################################################################################################
+# assign
+#
+# Assign one or more drives to a template, symlinking them into /assigned_drives/<template>.
+###################################################################################################
 
-cmd() {
-    CMD=$1
-    shift;
-    ARGS=$@
-    WIN_PWD=`wslpath -w "$(pwd)"`
-    cmd.exe /c "pushd ${WIN_PWD} && ${CMD} ${ARGS}"
-}
-
-WIN_SCRIPT_DIR=$( wslpath -w "$(pwd)" )
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../scripts_config"
 
 if [ -z "$2" ]; then
     echo "Missing arguments!"
-    echo "Usage: ./assign <template> <drive_uuid> [<drive_uuid>]...";
+    echo "Usage: $0 <template> <drive> [<drive>]...";
     exit 1
 fi
 
-ASSIGNED_PATH="$SCRIPT_DIR/../assigned_drives"
-if [ ! -d "$ASSIGNED_PATH" ]; then
-    mkdir "$ASSIGNED_PATH"
+DRIVES_PATH="$FIN_SDK_PATH/drives"
+ASSIGNED_DRIVES_PATH="$FIN_SDK_PATH/assigned_drives"
+if [ ! -d "$ASSIGNED_DRIVES_PATH" ]; then
+    mkdir "$ASSIGNED_DRIVES_PATH"
 fi
-if [ ! -d "$ASSIGNED_PATH/$1" ]; then
-    mkdir "$ASSIGNED_PATH/$1"
+if [ ! -d "$ASSIGNED_DRIVES_PATH/$1" ]; then
+    mkdir "$ASSIGNED_DRIVES_PATH/$1"
 fi
+
+# While changing to the /drives folder, get the path to use for Windows symlinking.
+cd "$DRIVES_PATH"
+WIN_DRIVES_PATH=$( cmdpwd )
 
 for DRIVE in "${@:2}"
 do
     # If this drive was previously assigned to another template, unlink it from that.
-    if [ -f "$ASSIGNED_PATH/$1/$DRIVE/.template" ]; then
-        TEMPLATE=$( cat "$ASSIGNED_PATH/$1/$DRIVE/.template" )
-        rm "$ASSIGNED_PATH/$TEMPLATE/$DRIVE"
+    if [ -f "$ASSIGNED_DRIVES_PATH/$1/$DRIVE/.template" ]; then
+        TEMPLATE=$( cat "$ASSIGNED_DRIVES_PATH/$1/$DRIVE/.template" )
+        rm "$ASSIGNED_DRIVES_PATH/$TEMPLATE/$DRIVE"
     fi
     
-    # Create the tag file on the drive and symlink folder the drive into the appropriate template.
-    echo $1 > "$SCRIPT_DIR/../drives/$DRIVE/.template"
-    WIN_DRIVE_PATH="$WIN_SCRIPT_DIR/../drives/$DRIVE"
-    cmd mklink /D "$WIN_SCRIPT_DIR\\..\\assigned_drives\\$1\\$DRIVE" "$WIN_SCRIPT_DIR\\..\\drives\\$DRIVE" > /dev/null 2>&1
-    # I don't do this because my editor is running under my Windows filesystem, so I needs a Windows symlink.
-    # ln -sf "$SCRIPT_DIR/../drives/$DRIVE" "$ASSIGNED_PATH/$1/$DRIVE"
+    # Create the .template file on the drive to store the template it is assigned to.
+    echo $1 > "$DRIVES_PATH/$DRIVE/.template"
+
+    # Symlink the drive into the /assigned_drives subfolder for its template. This makes it so that any
+    # changes to the copy under /assigned_drives is automatically reflected in the copy under /drives.
+    if [ "$SYMLINK_FOR_WINDOWS" -eq 1 ]; then
+        # Use Windows symlinking if requested.
+        cmdrun mklink /D "$WIN_DRIVES_PATH\\..\\assigned_drives\\$1\\$DRIVE" "$WIN_DRIVES_PATH\\$DRIVE" >/dev/null 2>&1
+    else
+        # Otherwise, use *nix symlinking instead.
+        ln -sf "$DRIVES_PATH/$DRIVE" "$ASSIGNED_DRIVES_PATH/$1/$DRIVE"
+    fi
     
     printf "Assigned drive ${RED}$DRIVE${NC} to template ${GREEN}$1${NC}.\n"
 done
 
-echo "Done!"
+cd $PWD
+
+printf "\nDone!\n"
