@@ -1,33 +1,36 @@
-------------------------------------------------------------------------------------------------------------------------------------------------------
--- Overwrite these in env_config.lua -----------------------------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------------------------------------------------------------------
-MATERIAL_SYMBOL         = "CONC"    -- To look up the material being stored (stack size, name, etc)
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+-- Overwrite these in env_config.lua ----------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------------------
 FEEDBACK_RATE_MS        = 500       -- How many ms between updates of the UI?
-MAX_EVENT_HANDLING_RATE = 10        -- Max number of events that can be handled per-lua-tick.
-MAX_ITEM_TRANSFER_RATE  = 10        -- Max number of items that can be transferred per-lua-tick.
+TIMEOUT_PERIOD_MS       = 10000     -- How many ms without any updates for a storage unit until we mark is as timed out?
+MAX_EVENT_HANDLING_RATE = 3         -- Max number of events that can be handled per-lua-tick.
 TARGET_DIAL_SENSITIVITY = 5         -- Percentage points to adjust TargetPercent by with each rotation of the TargetDial.
+CONTROLS = {                        -- Map {material symbol} => {panel & anchor position} so we can find the related panel controls/displays.
+    CONC = {
+        panelName  = "Panel01",
+        panelIndex = 0,
+        anchorPos  = Vector2(1, 10),
+    },
+}
+-----------------------------------------------------------------------------------------------------------------------------------------------------
 
--- Components
-CONTAINER_NAME             = "Container"
-SPLITTER_NAME              = "Splitter"
-PANEL_NAME                 = "Panel"
-BYPASS_BUTTON_POS          = Vector2(5, 10)
-TARGET_DIAL_POS            = Vector2(5, 9)
-GRAPHIC_STATUS_SCREEN_POS  = Vector2(6, 10)
-TEXT_STATUS_SCREEN_POS     = Vector2(1, 10)
-------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Offsets (from an anchor position on a panel)
+CONTROL_OFFSET_TEXT_DISPLAY    = Vector2(0, 0)
+CONTROL_OFFSET_GRAPHIC_DISPLAY = Vector2(5, 0)
+CONTROL_OFFSET_BYPASS_BUTTON   = Vector2(4, 0)
+CONTROL_OFFSET_TARGET_DIAL     = Vector2(4, -1)
 
--- Output displays
-UI_CLEAR_COLOR             = { 0, 0, 0, 0 }
-UI_METER_BG_COLOR          = { 0.02, 0.02, 0.02, 1 }
-UI_METER_FG_COLOR          = { 0.05, 0.06, 0.15, 1 }
-UI_METER_BORDER_COLOR      = { 1, 1, 1, 1 }
-UI_METER_TARGET_COLOR      = { 1, 1, 1, 1 }
-GRAPHIC_STATUS_SCREEN_POS  = Vector2(6, 10)
-TEXT_STATUS_SCREEN_POS     = Vector2(1, 10)
+-- UI Display settings
+UI_CLEAR_COLOR          = { 0, 0, 0, 0 }
+UI_METER_TIMEOUT_COLOR  = { 0.05, 0.05, 0.05, 1 }
+UI_METER_BG_COLOR       = { 0.02, 0.02, 0.02, 1 }
+UI_METER_FG_COLOR       = { 0.05, 0.06, 0.15, 1 }
+UI_METER_BORDER_COLOR   = { 1, 1, 1, 1 }
+UI_METER_TARGET_COLOR   = { 1, 1, 1, 1 }
 
 -- Colours
-COLOR_OVERBYPASS = { 0.1, 1.0, 1.0, 1.0 } -- Bypassed but it would flow even if it wasn't
-COLOR_BYPASSED   = { 0.1, 0.1, 1.0, 1.0 }
-COLOR_FLOWING    = { 0.1, 1.0, 0.1, 1.0 }
-COLOR_HOLDING    = { 1.0, 0.1, 0.1, 1.0 }
+COLOR_OVERBYPASS = { 0.1, 1.0, 1.0, 1 } -- Bypassed but it would flow even if it wasn't
+COLOR_BYPASSED   = { 0.1, 0.1, 1.0, 1 }
+COLOR_FLOWING    = { 0.1, 1.0, 0.1, 1 }
+COLOR_HOLDING    = { 1.0, 0.1, 0.1, 1 }
+COLOR_TIMEOUT    = { 0.0, 0.0, 0.0, 1 }

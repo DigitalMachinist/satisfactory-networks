@@ -8,28 +8,6 @@ Materials = {}
 -- State
 PrevFeedbackTime = 0  -- Timestamp (ms) of the most recent update of the UI.
 
-function DetectTimeouts()
-    for materialSymbol, _ in pairs(Materials) do
-        Materials[materialSymbol]["timeout"] = Materials[materialSymbol]["timestamp"] < (computer.millis() - TIMEOUT_PERIOD_MS)
-    end
-end
-
-function OutputFeedback(force)
-    if force == nil then
-        force = true
-    end
-
-    for materialSymbol, _ in pairs(Materials) do
-        if (force or Materials[materialSymbol]["isDirty"]) then
-            SetBypassButtonStatus(materialSymbol)
-            DrawText(materialSymbol)
-            DrawGraphics(materialSymbol)
-        end
-    end
-
-    PrevFeedbackTime = computer.millis()
-end
-
 function App()
     RunFile("/primary/app_config.lua", true, "app config")
     RunFile("/primary/env_config.lua", true, "env config")

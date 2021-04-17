@@ -1,14 +1,24 @@
-function DrawText()
-    if (TextStatusScreen == nil) then
+function DrawText(materialSymbol)
+    if (Materials[materialSymbol] == nil) then
         return
     end
 
+    local textDisplay = Controls[materialSymbol]["textDisplay"]
+    if (textDisplay == nil) then
+        return
+    end
+
+    local timeoutNotice = ""
+    if Materials[materialSymbol]["timeout"] then
+        timeoutNotice = "    [D/C]"
+    end
+
     local lines = {
-        " "..MATERIAL_SYMBOL.." ("..tonumber(string.format("%.0f", PercentStored)).."%)",
-        " = "..NumStored.." / "..StoreSize,
-        " > "..TargetNumStored.." ("..TargetPercent.."%)"
+        " "..materialSymbol.." ("..tonumber(string.format("%.0f", Materials[materialSymbol]["percentStored"])).."%)"..timeoutNotice,
+        " = "..Materials[materialSymbol]["numStored"].." / "..Materials[materialSymbol]["storeSize"],
+        " > "..Materials[materialSymbol]["targetNum"].." ("..Materials[materialSymbol]["targetPercent"].."%)"
     }
 
-    TextStatusScreen.size = 36
-    TextStatusScreen.text = table.concat(lines, '\n')
+    textDisplay.size = 36
+    textDisplay.text = table.concat(lines, '\n')
 end

@@ -10,15 +10,21 @@ function HandleEvents(maxEventsToPop)
         --print("Event: "..eventType)
         if eventType == "NetworkMessage" then
             HandleNetworkMessage(eventData)
-        elseif eventType == "Trigger" then
-            -- Toggle IsBypassed when the bypass button is pressed.
-            HandleBypassButtonPush()
-            print("Bypass updated to "..tostring(IsBypassed))
+            return
+        end
+
+        local materialSymbol = ModuleMap[eventData[2].hash]
+        if eventType == "Trigger" then
+            -- Toggle IsBypassed
+            if (materialSymbol ~= nil) then
+                HandleBypassButtonPush(materialSymbol)
+            end
         elseif eventType == "PotRotate" then
             -- Update the target number of items to store based on the target dial being rotated.
-            local anticlockwise = eventData[3]
-            HandleTargetDialChange(anticlockwise)
-            print("Target updated to "..TargetPercent.." ("..TargetNumStored..")")
+            if (materialSymbol ~= nil) then
+                local anticlockwise = eventData[3]
+                HandleTargetDialChange(materialSymbol, anticlockwise)
+            end
         end
     end
 end
