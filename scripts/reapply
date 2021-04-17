@@ -1,0 +1,61 @@
+#!/bin/bash
+
+###################################################################################################
+# reapply
+#
+# Updates the /app_drives folder by checking the app applied to all drives and sorting each one
+# into the appropriate app subfolder.
+#
+# This script is useful if your /app_drives folder gets deleted or modified somehow and you
+# just need to fix it for all drives. It also automatically runs after each `pull` to sort any
+# newly discovered drives into /app_drives/unapplied by default.
+###################################################################################################
+
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../config"
+
+# Delete /app_drives and remake it. This removes all symlinks, but the drive contents/files remain.
+rm -rf "$APP_DRIVES_PATH"
+mkdir "$APP_DRIVES_PATH"
+
+# While changing to the /drives folder, get the path to use for Windows symlinking.
+cd "$DRIVES_PATH"
+WIN_DRIVES_PATH=$( cmdpwd )
+
+# Reassign each drive based on its .app file to rebuild the /app_drives symlink folder.
+DRIVES="$( find . -mindepth 1 -maxdepth 1 -type d | sort -u | cut -c3-34 )"
+for DRIVE in $DRIVES
+do
+    DRIVE_PATH="$DRIVES_PATH/$DRIVE"
+    if [ -f "$DRIVE_PATH/.app" ]; then
+        APP=$( cat "$DRIVE_PATH/.app" )
+    else
+        APP="unassigned"
+    fi
+
+    if [ ! -d "$APP_DRIVES_PATH/$APP" ]; then
+        mkdir "$APP_DRIVES_PATH/$APP"
+    fi
+
+    # Symlink the drive into the /app_drives subfolder for the applied app. This makes it so that any
+    # changes to the folder under /app_drives are automatically reflected in the one under /drives.
+    # Note: For clarity, /drives is the *real* copy. Folders under /app_drives symlink to those.
+    if [ "$SYMLINK_FOR_WINDOWS" -eq 1 ]; then
+        # Use Windows symlinking if requested.
+        cmdrun mklink /D "$WIN_DRIVES_PATH\\..\\app_drives\\$APP\\$DRIVE" "$WIN_DRIVES_PATH\\$DRIVE" >/dev/null 2>&1
+    else
+        # Otherwise, use *nix symlinking instead.
+        ln -sf "$DRIVE_PATH" "$APP_DRIVES_PATH/$APP/$DRIVE"
+    fi
+
+    if [ "$APP" = "unassigned" ]; then
+        printf "Drive ${RED}$DRIVE${NC} is not applied to an app.\n"
+    else
+        "$SCRIPTS_PATH/tag" "$APP" $DRIVE >/dev/null 2>&1
+        printf "Drive ${RED}$DRIVE${NC} is an instance of app ${GREEN}$APP${NC}.\n"
+    fi
+done
+
+cd $PWD
+
+important "\nDone!"

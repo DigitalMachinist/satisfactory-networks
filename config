@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ###################################################################################################
-# scripts_config
+# config
 #
 # This file contains constants needed to make deploy scripts work.
 #
@@ -13,31 +13,46 @@
 ### YOU NEED TO SET THESE YOURSELF! ###############################################################
 
 # Path to your Satisfactory data folder in your bash environment (no trailing slash `/`)
+#
 # This is *not* a Windows path like "C:\Users\digitalmachinist\AppData\Local\FactoryGame"!
+#
 # For example:
 # 1. "/c/Users/digitalmachinist/AppData/Local/FactoryGame"       <--- (OK) Git Bash / MINGW64 style
 # 2. "/mnt/c/Users/digitalmachinist/AppData/Local/FactoryGame"   <--- (OK) WSL for Windows style
 # 3. "C:\Users\digitalmachinist\AppData\Local\FactoryGame"       <--- (BAD!) Windows style
 SATISFACTORY_DATA_PATH="/mnt/c/Users/jrose/AppData/Local/FactoryGame"
 
-# Is your editor running in Windows?
-# I run WSL bash under Windows and my editor runs under Windows so I need to use Windows symlinks. 
-# If your editor is running under Linux also, we can use *nix symlinks for your /assigned_drives
-# by setting this value to 0. If you aren't sure, probably set this to 1.
+# Is your editor running in Windows (not in your *nix environment)?
+#
+# I run WSL bash while my editor runs under Windows so I need to use Windows symlinks for my
+# editor's sidebar to display the contents of my /app_drives folder. If your /app_drives folder
+# seems empty in your editor, this might be set to the wrong value for you.
+#
+# If your editor is running under *nix, we can use *nix symlinks for your /app_drives by setting
+# this value to 0 instead. I have not tested this thoroughly. lmk if this misbehaves.
+#
+# If none of that made sense, probably leave this set to 1.
 SYMLINK_FOR_WINDOWS=1
 
 ###################################################################################################
 
 
 
+# Get the path the script is being run from, so we can return to it when we're done.
+PWD=$( pwd )
+
 # Get the path to your Satisfactory FIN computers folder.
 FIN_COMPUTERS_PATH="$SATISFACTORY_DATA_PATH/Saved/SaveGames/Computers"
 
 # Get the path to the current script, so we can resolve paths relative to it.
 FIN_SDK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-
-# Get the path the script is being run from as well, so we can return to it when we've done.
-PWD=$( pwd )
+APPS_PATH="$FIN_SDK_PATH/apps"
+APP_DRIVES_PATH="$FIN_SDK_PATH/app_drives"
+BACKUPS_PATH="$FIN_SDK_PATH/backups"
+DRIVES_PATH="$FIN_SDK_PATH/drives"
+LIBS_PATH="$FIN_SDK_PATH/libs"
+SCRIPTS_PATH="$FIN_SDK_PATH/scripts"
+EEPROM_PATH="$FIN_SDK_PATH/eeprom.lua"
 
 # Colours!
 NC='\033[0m'
@@ -71,4 +86,8 @@ cmdrun() {
     ARGS=$@
     WIN_PWD=`winpwd()`
     cmd.exe /c "pushd ${WIN_PWD} && ${CMD} ${ARGS}"
+}
+
+important() {
+    printf "${YELLOW}$1${NC}"
 }

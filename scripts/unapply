@@ -1,0 +1,55 @@
+#!/bin/bash
+
+###################################################################################################
+# unapply
+#
+# Unapply one or more drives, such that app builds will no longer update the drives' files. The
+# drives' files are unaffected, so any FIN computer that boots it will still run any app code on
+# the drive, it just won't be updated with newer builds of the app when the `build` script runs.
+#
+# When a drive is unapplied, a symlink will be made from /app_drives/unapplied/<drive_uuid> to the
+# drive's real folder at /drives/<drive_uuid> so their folder contents will always match.
+#
+# Note: Unapplied drives are also `tag`ged as "unapplied" and can be looked up using the `findtag`
+# script.
+###################################################################################################
+
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../config"
+
+if [ -z "$1" ]; then
+    important "Missing arguments!\nUsage: $0 <drive_uuid> [<drive_uuid>]...\n";
+    exit 1
+fi
+
+if [ ! -d "$APP_DRIVES_PATH" ]; then
+    important "Nothing to do!\n"
+    exit 0
+fi
+
+NEW_APP="unapplied"
+for DRIVE in "${@:1}"
+do
+    # If this drive was not applied to an app, continue to the next one.
+    DRIVE_PATH="$DRIVES_PATH/$DRIVE"
+    if [ ! -f "$DRIVE_PATH/.app" ]; then
+        printf "Drive ${RED}$DRIVE${NC} is not applied to an app.\n"
+        continue
+    fi
+    OLD_APP=$( cat "$DRIVE_PATH/.app" )
+    if [ "$OLD_APP" == "unapplied" ]; then
+        printf "Drive ${RED}$DRIVE${NC} is not applied to an app.\n"
+        continue
+    fi
+
+    # Remove the obsolete app symlink.
+    rm "$APP_DRIVES/$OLD_APP/$DRIVE"
+
+    # Update the .app file to "unapplied" and tag the drive as such.
+    echo "$NEW_APP" > "$DRIVE_PATH/.app"
+    "$SCRIPT_PATH/tag" "$NEW_APP" $DRIVE >/dev/null 2>&1
+    
+    printf "Drive ${RED}$DRIVE${NC} is no longer applied to ${GREEN}$OLD_APP${NC}.\n"
+done
+
+important "\nDone!\n"

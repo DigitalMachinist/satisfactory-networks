@@ -3,18 +3,21 @@
 ###################################################################################################
 # push
 #
-# Publishes current build of FIN SDK drives to Satisfactory FIN computers folder.
+# Install the current FIN SDK /drives folder to your Satisfactory FIN computers folder. This makes
+# any file changes to these drives available ingame immediately.
+#
+# *IMPORTANT* You must restart any FIN comupters ingame to start executing new code.
 #
 # This script will back up your existing FIN computers folder every time it is run just in case
 # something important gets overwritten.
 ###################################################################################################
 
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "$SCRIPT_PATH/../scripts_config"
+source "$SCRIPT_PATH/../config"
 
 # Copy current Satisfactory FIN computer folder into a backup folder in case anything breaks.
-BACKUP_FOLDER_NAME=`date +%Y-%m-%d_%H-%M-%S`
-BACKUP_PATH="$FIN_SDK_PATH/backup/$BACKUP_FOLDER_NAME"
+TIMESTAMP=`date +%Y-%m-%d_%H-%M-%S`
+BACKUP_PATH="$BACKUPS_PATH/$TIMESTAMP"
 if [ ! -d "$BACKUP_PATH" ]; then
     mkdir "$BACKUP_PATH"
 fi
@@ -24,6 +27,7 @@ printf "  ╰──▶ ${GREEN}$BACKUP_PATH${NC}\n\n"
 
 # Use the pull script to sync data from the Satisfactory state.
 # This is important to maintain settings of computer systems set up ingame!!!
+#
 # TODO: Why is this conditional again? Seems like I'm doing this to prevent data files from being overwritten on push?
 if [ -z "$1" ]; then
     ./pull >/dev/null 2>&1
@@ -35,7 +39,7 @@ cd "$FIN_COMPUTERS_PATH"
 find . -mindepth 1 -name \* -delete
 
 # Publish the repo drives into the Satisfactory folder.
-cp -rf $FIN_SDK_PATH/drives/* "$FIN_COMPUTERS_PATH"
+cp -rf $DRIVES_PATH/* "$FIN_COMPUTERS_PATH"
 printf "Published drives to Satisfactory FIN computers folder:\n"
 printf "  ╰──▶ ${GREEN}$FIN_COMPUTERS_PATH${NC}\n\n"
 

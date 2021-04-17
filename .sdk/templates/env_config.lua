@@ -1,0 +1,6 @@
+-- Use this file to assign any config values that differ between each drive your app runs on.
+-- It will never be overwritten by any app build.
+--
+-- For example:
+-- Maybe you have an app that runs on several different computers: one for each type of material.
+-- You could define the type of material this computer handles in this file. 

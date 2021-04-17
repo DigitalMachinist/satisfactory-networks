@@ -3,55 +3,50 @@
 ###################################################################################################
 # build
 #
-# Compile together the template, library and EEPROM files for a template and update all drives
-# assigned to the template with the latest build of the code files.
+# Compile the app, libraries and EEPROM files for the given app and update all drives that the app
+# is applied to with the latest build of the code files.
 #
-# This will overwrite code files for all drives assigned to the template. Additionally, the 
-# eeprom.lua template taken from the root folder of the project will automatically have the
-# drive's UUID set as the primary drive alias to make it bootable as the app code.
+# This will overwrite code files for all drives the app is applied to. Additionally, the eeprom.lua
+# template taken from the root folder of the project will automatically have the drive's UUID set
+# as the primary drive alias to make it bootable as the app code.
 ###################################################################################################
 
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "$SCRIPT_PATH/../scripts_config"
+source "$SCRIPT_PATH/../config"
 
 # This is the string to find and replace in eeprom.lua with each drive's UUID.
 UUID_REPLACE="__DRIVE_UUID__"
 
 if [ -z "$1" ]; then
-    echo "Argument 'template' is required!"
-    echo "Usage: $0 <template>";
+    important "Argument 'template' is required!\nUsage: $0 <app_name>\n";
     exit 1
 fi
 
-EEPROM_PATH="$FIN_SDK_PATH/eeprom.lua"
-DRIVES_PATH="$FIN_SDK_PATH/drives"
-LIBRARIES_PATH="$FIN_SDK_PATH/libraries"
-TEMPLATES_PATH="$FIN_SDK_PATH/templates"
-ASSIGNED_DRIVES_PATH="$FIN_SDK_PATH/assigned_drives"
+APP_PATH="$APPS_PATH/$APP"
+printf "Building drives from template ${GREEN}$APP${NC}:\n"
+printf "  ╰──▶ ${GREEN}$APP_PATH${NC}\n\n"
 
-printf "Building drives from template ${GREEN}$1${NC}:\n"
-printf "  ╰──▶ ${GREEN}$TEMPLATES_PATH/$1${NC}\n\n"
-
-# Find all drives assigned to this template and update their files from the current template, library & EEPROM files.
-cd "$ASSIGNED_DRIVES_PATH/$1"
+# Find all drives the app is applied to and update their files from the current app, library & EEPROM files.
+APP=$1
+cd "$APP_DRIVES_PATH/$APP"
 DRIVES="$( find . -mindepth 1 -maxdepth 1 | sort -u | cut -c3-34 )"
 for DRIVE in $DRIVES
 do
-    printf "Building drive ${RED}$DRIVE${NC} from template ${GREEN}$1${NC}!\n"
+    printf "Building app ${GREEN}$APP${NC} to drive ${RED}$DRIVE${NC}!\n"
 
-    # Copy all template and common files into the drive folder, preserving files/folders that needs to remain untouched.
+    # Copy all app and common files into the drive, preserving files/folders that need to remain unchanged.
     find "./$DRIVE" -mindepth 1 \( ! -path "*/data*" ! -path "*/env_config.lua" ! -path "*/README.md" ! -path "*/.template" \) -delete # Delete all but the data folder, env_config.lua and README.md.
     DRIVE_PATH="$DRIVES_PATH/$DRIVE"
-    cp $TEMPLATES_PATH/$1/* "$DRIVE_PATH" >/dev/null 2>&1 # Copy all files from the top-level template folder (non-recursive). MUST HAVE NO QUOTES ON SRC PATH!
-    cp -rf --no-clobber "$TEMPLATES_PATH/$1/data" "$DRIVE_PATH" # Copy files from the data folder but *DO NOT OVERWRITE THE DESTINATION*.
-    cp -rf "$TEMPLATES_PATH/$1/src" "$DRIVE_PATH"
-    cp -rf "$TEMPLATES_PATH/$1/tags" "$DRIVE_PATH"
-    cp -rf "$LIBRARIES_PATH" "$DRIVE_PATH"
+    cp $APP_PATH/* "$DRIVE_PATH" >/dev/null 2>&1 # Copy all files from the top-level app folder (non-recursive). MUST HAVE NO QUOTES ON SRC PATH!
+    cp -rf --no-clobber "$APP_PATH/data" "$DRIVE_PATH" # Copy files from the data folder but *DO NOT OVERWRITE THE DESTINATION*.
+    cp -rf "$APP_PATH/src" "$DRIVE_PATH"
+    cp -rf "$APP_PATH/tags" "$DRIVE_PATH"
+    cp -rf "$LIBS_PATH" "$DRIVE_PATH"
     cp "$EEPROM_PATH" "$DRIVE_PATH"
 
-    # Create these files if they're missing, but if they exst don't change them.
-    touch "$DRIVE_PATH/env_config.lua"
-    touch "$DRIVE_PATH/README.md"
+    # Create these files from templates if they're missing, but if they exist don't change them.
+    cp -f --no-clobber "$FIN_SDK_PATH/.sdk/templates/env_config.lua" "$DRIVE_PATH/env_config.lua"
+    cp -f --no-clobber "$FIN_SDK_PATH/.sdk/templates/README.lua" "$DRIVE_PATH/README.md"
 
     # Find and replace the drive UUID in the EEPROM file to make it bootable EEPROM code.
     sed -i s/$UUID_REPLACE/$DRIVE/ "$DRIVE_PATH/eeprom.lua"
@@ -59,4 +54,4 @@ done
 
 cd $PWD
 
-printf "\nDone!\n"
+important "\nDone!\n"

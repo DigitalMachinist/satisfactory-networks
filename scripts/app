@@ -1,0 +1,31 @@
+#!/bin/bash
+
+###################################################################################################
+# app
+#
+# Create a new skeleton app with the given name.
+#
+# This script won't run if the app you're trying to create already exists. You'll need to delete
+# that one manually first before you can create a new one with that name. This is just a little
+# safety feature to make certain you don't overwrite any of your apps by accident.
+###################################################################################################
+
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../config"
+
+if [ -z "$1" ]; then
+    important "Missing arguments!\nUsage: $0 <app_name>\n";
+    exit 1
+fi
+
+APP_PATH="$APPS_PATH/$1"
+if [ -d "$APP_PATH" ]; then
+    important "App aleady exists! Delete it first manually if you want to replace it.\n"
+    exit 2
+fi
+
+cp -rf "$FIN_SDK_PATH/.sdk/templates/app" "$APP_PATH"
+
+printf "Created new app ${GREEN}$1${NC}:\n"
+printf "  ╰──▶ ${GREEN}$APP_PATH${NC}\n\n"
+important "Done!\n"

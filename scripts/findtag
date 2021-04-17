@@ -6,44 +6,40 @@
 # List the drives that have been tagged with the given identifier.
 #
 # You may use tags for whatever purpose you like. They are a freeform system to let you group
-# your drives and more easily look up sets of drives that share something in common.
+# your drives and more easily look up sets of drives that share things in common.
 ###################################################################################################
 
 SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "$SCRIPT_PATH/../scripts_config"
+source "$SCRIPT_PATH/../config"
 
 if [ -z "$1" ]; then
-    printf "Argument 'tag' is required!\n"
-    printf "Usage: $0 <tag>\n";
+    important "Argument 'tag' is required!\nUsage: $0 <tag>\n";
     exit 1
 fi
 
 # Look up any drives with tags matching the query. If there are none, report that nothing was found.
-DRIVES_PATH="$FIN_SDK_PATH/drives"
 cd "$DRIVES_PATH"
 DRIVES="$( find . -mindepth 1 -maxdepth 1 -type d -exec test -f '{}'/tags/$1 \; -print | sort -u | cut -c3-34 )"
 if [ ${#DRIVES[@]} -eq 0 ]; then
-    printf "No matching drives...\n"
-    printf "\nDone!\n"
+    important "No matching drives...\n\nDone!\n"
     exit 0
 elif [ "$DRIVES" == "" ]; then
-    printf "No matching drives...\n"
-    printf "\nDone!\n"
+    important "No matching drives...\n\nDone!\n"
     exit 0
 fi
 
-# Otherwise, report all of the matching drives and their templates.
+# Otherwise, report all of the matching drives and their applied apps.
 for DRIVE in $DRIVES
 do
-    if [ -f "$DRIVES_PATH/$DRIVE/.template" ]; then
-        TEMPLATE=$( cat "$DRIVES_PATH/$DRIVE/.template" )
+    if [ -f "$DRIVES_PATH/$DRIVE/.app" ]; then
+        APP=$( cat "$DRIVES_PATH/$DRIVE/.app" )
     else
-        TEMPLATE="unassigned"
+        APP="unapplied"
     fi
 
-    printf "Drive ${RED}$DRIVE${NC} (${GREEN}$TEMPLATE${NC})!\n"
+    printf "Match: Drive ${RED}$DRIVE${NC} (${GREEN}$APP${NC})!\n"
 done
 
 cd $PWD
 
-printf "\nDone!\n"
+important "\nDone!\n"

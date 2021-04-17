@@ -1,16 +1,28 @@
 #!/bin/bash
 
-PWD="$( pwd )"
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+###################################################################################################
+# findtag
+#
+# List the drives that have been tagged with the given identifier.
+#
+# You may use tags for whatever purpose you like. They are a freeform system to let you group
+# your drives and more easily look up sets of drives that share things in common.
+###################################################################################################
 
-read -p "Are you sure? " -n 1 -r
+SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$SCRIPT_PATH/../config"
+
+read -p "Are you sure? This will delete all backups of your FIN computers. " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
-    echo "Cleaning backup folder..."
-    cd "$SCRIPT_DIR/../backup"
-    find . -mindepth 1 -name \* -delete # rm -rf wasn't working here but this does the job.
-    cd "$PWD"
-fi
+    printf "Cleaning backups folder:\n"
+    printf "  ╰──▶ ${GREEN}$BACKUPS_PATH${NC}\n\n"
 
-echo "Done!"
+    cd "$BACKUPS_PATH"
+    find . -mindepth 1 -name \* -delete
+    cd "$PWD"
+    important "\nDone!\n"
+else
+    important "\nAborted.\n"
+fi
