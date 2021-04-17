@@ -16,13 +16,10 @@ source "$SCRIPT_PATH/../scripts_config"
 
 DRIVES_PATH="$FIN_SDK_PATH/drives"
 ASSIGNED_DRIVES_PATH="$FIN_SDK_PATH/assigned_drives"
-if [ ! -d "$ASSIGNED_DRIVES_PATH" ]; then
-    mkdir "$ASSIGNED_DRIVES_PATH"
-fi
 
-# Delete all existing /assigned_drives subfolders and symlinks.
-# This just removes the links, not the actual files.
-rm -rf "$ASSIGNED_DRIVES_PATH/*"
+# Delete /assigned_drives and remake it. This removes the symlinks, but the actual files remain.
+rm -rf "$ASSIGNED_DRIVES_PATH"
+mkdir "$ASSIGNED_DRIVES_PATH"
 
 # While changing to the /drives folder, get the path to use for Windows symlinking.
 cd "$DRIVES_PATH"
@@ -55,6 +52,7 @@ do
     if [ "$TEMPLATE" = "unassigned" ]; then
         printf "Drive ${RED}$DRIVE${NC} unassigned.\n"
     else
+        "$FIN_SDK_PATH/scripts/tag $TEMPLATE $DRIVE" >/dev/null 2>&1
         printf "Assigned drive ${RED}$DRIVE${NC} to template ${GREEN}$TEMPLATE${NC}.\n"
     fi
 done

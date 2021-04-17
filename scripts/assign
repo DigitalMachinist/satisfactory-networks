@@ -38,6 +38,7 @@ do
     
     # Create the .template file on the drive to store the template it is assigned to.
     echo $1 > "$DRIVES_PATH/$DRIVE/.template"
+    "$FIN_SDK_PATH/scripts/tag $1 $DRIVE" >/dev/null 2>&1
 
     # Symlink the drive into the /assigned_drives subfolder for its template. This makes it so that any
     # changes to the copy under /assigned_drives is automatically reflected in the copy under /drives.
