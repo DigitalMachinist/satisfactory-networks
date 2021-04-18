@@ -22,12 +22,12 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+APP=$1
 APP_PATH="$APPS_PATH/$APP"
 printf "Building drives from template ${GREEN}$APP${NC}:\n"
 printf "  ╰──▶ ${GREEN}$APP_PATH${NC}\n\n"
 
 # Find all drives the app is applied to and update their files from the current app, library & EEPROM files.
-APP=$1
 cd "$APP_DRIVES_PATH/$APP"
 DRIVES="$( find . -mindepth 1 -maxdepth 1 | sort -u | cut -c3-34 )"
 for DRIVE in $DRIVES
@@ -46,7 +46,7 @@ do
 
     # Create these files from templates if they're missing, but if they exist don't change them.
     cp -f --no-clobber "$FIN_SDK_PATH/.sdk/templates/env_config.lua" "$DRIVE_PATH/env_config.lua"
-    cp -f --no-clobber "$FIN_SDK_PATH/.sdk/templates/README.lua" "$DRIVE_PATH/README.md"
+    cp -f --no-clobber "$FIN_SDK_PATH/.sdk/templates/README.md" "$DRIVE_PATH/README.md"
 
     # Find and replace the drive UUID in the EEPROM file to make it bootable EEPROM code.
     sed -i s/$UUID_REPLACE/$DRIVE/ "$DRIVE_PATH/eeprom.lua"

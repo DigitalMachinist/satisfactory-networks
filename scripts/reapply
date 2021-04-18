@@ -30,7 +30,7 @@ do
     if [ -f "$DRIVE_PATH/.app" ]; then
         APP=$( cat "$DRIVE_PATH/.app" )
     else
-        APP="unassigned"
+        APP="unapplied"
     fi
 
     if [ ! -d "$APP_DRIVES_PATH/$APP" ]; then
@@ -58,4 +58,4 @@ done
 
 cd $PWD
 
-important "\nDone!"
+important "\nDone!\n"

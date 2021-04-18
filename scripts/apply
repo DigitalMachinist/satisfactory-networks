@@ -25,15 +25,16 @@ fi
 if [ ! -d "$APP_DRIVES_PATH" ]; then
     mkdir "$APP_DRIVES_PATH"
 fi
-if [ ! -d "$APP_DRIVES_PATH/$1" ]; then
-    mkdir "$APP_DRIVES_PATH/$1"
+
+NEW_APP=$1
+if [ ! -d "$APP_DRIVES_PATH/$NEW_APP" ]; then
+    mkdir "$APP_DRIVES_PATH/$NEW_APP"
 fi
 
 # While changing to the /drives folder, get the path to use for Windows symlinking.
 cd "$DRIVES_PATH"
 WIN_DRIVES_PATH=$( cmdpwd )
 
-NEW_APP=$1
 for DRIVE in "${@:2}"
 do
     # If this drive was previously assigned to another app, unlink it from that.
@@ -41,6 +42,7 @@ do
     if [ -f "$DRIVE_PATH/.app" ]; then
         OLD_APP=$( cat "$DRIVE_PATH/.app" )
         rm "$APP_DRIVES_PATH/$OLD_APP/$DRIVE"
+        "$SCRIPT_PATH/untag" "$OLD_APP" $DRIVE >/dev/null 2>&1
     fi
     
     # Update the .app file to the new app name and tag the drive with the app name.
@@ -52,6 +54,7 @@ do
     # Note: For clarity, /drives is the *real* copy. Folders under /app_drives symlink to those.
     if [ "$SYMLINK_FOR_WINDOWS" -eq 1 ]; then
         # Use Windows symlinking if requested.
+        echo "win"
         cmdrun mklink /D "$WIN_DRIVES_PATH\\..\\app_drives\\$NEW_APP\\$DRIVE" "$WIN_DRIVES_PATH\\$DRIVE" >/dev/null 2>&1
     else
         # Otherwise, use *nix symlinking instead.
