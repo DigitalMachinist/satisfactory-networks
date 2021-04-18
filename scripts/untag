@@ -19,7 +19,7 @@ fi
 
 for DRIVE in "${@:2}"
 do
-    rm -I "$DRIVE_PATH/$DRIVE/tags/$1" >/dev/null 2>&1
+    rm -I "$DRIVES_PATH/$DRIVE/tags/$1" >/dev/null 2>&1
     printf "Removed tag ${CYAN}$1${NC} from drive ${RED}$DRIVE${NC}!\n"
 done
 

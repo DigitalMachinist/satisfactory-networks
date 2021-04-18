@@ -23,11 +23,18 @@ if [ -z "$1" ]; then
 fi
 
 if [ ! -d "$APP_DRIVES_PATH" ]; then
-    important "Nothing to do!\n"
-    exit 0
+    mkdir "$APP_DRIVES_PATH"
 fi
 
 NEW_APP="unapplied"
+if [ ! -d "$APP_DRIVES_PATH/$NEW_APP" ]; then
+    mkdir "$APP_DRIVES_PATH/$NEW_APP"
+fi
+
+# While changing to the /drives folder, get the path to use for Windows symlinking.
+cd "$DRIVES_PATH"
+WIN_DRIVES_PATH=$( cmdpwd )
+
 for DRIVE in "${@:1}"
 do
     # If this drive was not applied to an app, continue to the next one.
@@ -43,13 +50,30 @@ do
     fi
 
     # Remove the obsolete app symlink.
-    rm "$APP_DRIVES/$OLD_APP/$DRIVE"
+    rm "$APP_DRIVES_PATH/$OLD_APP/$DRIVE"
 
     # Update the .app file to "unapplied" and tag the drive as such.
     echo "$NEW_APP" > "$DRIVE_PATH/.app"
     "$SCRIPT_PATH/tag" "$NEW_APP" $DRIVE >/dev/null 2>&1
+
+    # Symlink the drive into the /app_drives "unapplied" subfolder. This makes it so that any
+    # changes to the folder under /app_drives are automatically reflected in the one under /drives.
+    # Note: For clarity, /drives is the *real* copy. Folders under /app_drives symlink to those.
+    if [ "$SYMLINK_FOR_WINDOWS" -eq 1 ]; then
+        # Use Windows symlinking if requested.
+        cmdrun mklink /D "$WIN_DRIVES_PATH\\..\\app_drives\\$NEW_APP\\$DRIVE" "$WIN_DRIVES_PATH\\$DRIVE" >/dev/null 2>&1
+    else
+        # Otherwise, use *nix symlinking instead.
+        ln -sf "$DRIVE_PATH" "$APP_DRIVES_PATH/$NEW_APP/$DRIVE"
+    fi
     
-    printf "Drive ${RED}$DRIVE${NC} is no longer applied to ${GREEN}$OLD_APP${NC}.\n"
+    if [ "$OLD_APP" = "unassigned" ]; then
+        printf "Drive ${RED}$DRIVE${NC} is not applied to an app.\n"
+    else
+        printf "Drive ${RED}$DRIVE${NC} is no longer applied to ${GREEN}$OLD_APP${NC}.\n"
+    fi
 done
+
+cd $PWD
 
 important "\nDone!\n"

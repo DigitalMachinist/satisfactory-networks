@@ -21,10 +21,10 @@ fi
 cd "$DRIVES_PATH"
 DRIVES="$( find . -mindepth 1 -maxdepth 1 -type d -exec test -f '{}'/tags/$1 \; -print | sort -u | cut -c3-34 )"
 if [ ${#DRIVES[@]} -eq 0 ]; then
-    important "No matching drives...\n\nDone!\n"
+    important "No matching drives.\n\nDone!\n"
     exit 0
 elif [ "$DRIVES" == "" ]; then
-    important "No matching drives...\n\nDone!\n"
+    important "No matching drives.\n\nDone!\n"
     exit 0
 fi
 

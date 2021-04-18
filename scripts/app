@@ -20,7 +20,8 @@ fi
 
 APP_PATH="$APPS_PATH/$1"
 if [ -d "$APP_PATH" ]; then
-    important "App aleady exists! Delete it first manually if you want to replace it.\n"
+    important "App ${GREEN}$1${YELLOW} already exists! Delete it first manually if you want to replace it.\n"
+    printf "  ╰──▶ ${GREEN}$APP_PATH${NC}\n"
     exit 2
 fi
 

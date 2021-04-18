@@ -25,15 +25,16 @@ fi
 if [ ! -d "$APP_DRIVES_PATH" ]; then
     mkdir "$APP_DRIVES_PATH"
 fi
-if [ ! -d "$APP_DRIVES_PATH/$1" ]; then
-    mkdir "$APP_DRIVES_PATH/$1"
+
+NEW_APP=$1
+if [ ! -d "$APP_DRIVES_PATH/$NEW_APP" ]; then
+    mkdir "$APP_DRIVES_PATH/$NEW_APP"
 fi
 
 # While changing to the /drives folder, get the path to use for Windows symlinking.
 cd "$DRIVES_PATH"
 WIN_DRIVES_PATH=$( cmdpwd )
 
-NEW_APP=$1
 for DRIVE in "${@:2}"
 do
     # If this drive was previously assigned to another app, unlink it from that.

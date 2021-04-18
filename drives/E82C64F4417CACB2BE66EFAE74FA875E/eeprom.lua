@@ -1,3 +1,20 @@
+---------------------------------------------------------------------------------------------------
+-- eeprom.lua
+---------------------------------------------------------------------------------------------------
+-- This is the file that runs on all of your computers' EEPROMs and is responsible for booting
+-- updates the filesystem so that your drives can be loaded to run app code. 
+--
+-- You should rarely -- if ever -- modify this file yourself. Any time changes are made to this
+-- file, you need to update computers ingame manually to run the new code by copy-pasting the new
+-- epprom.lua code into the FIN ingame editor. It is *MUCH EASIER* to modify/build/push an app
+-- than it is to fool with this. If you find yourself editing this file, ask yourself:
+--
+-- "Why am I not editing an app instead?"
+--
+-- This file is only a template. When eeprom.lua gets included on a drive in the `build` script,
+-- E82C64F4417CACB2BE66EFAE74FA875E is automatically replaced with the UUID of the drive.
+---------------------------------------------------------------------------------------------------
+
 -- Required: The main disk to boot from (config, functions, component instructions).
 DRIVE_UUID_PRIMARY = "E82C64F4417CACB2BE66EFAE74FA875E"
 
@@ -170,8 +187,8 @@ function Main()
     print()
     MountAllDrives()
     print()
-    UpdateEEPROM("/primary/eeprom.lua", "/primary/tags/update_lock")
-    print()
+    --UpdateEEPROM("/primary/eeprom.lua", "/primary/tags/update_lock")
+    --print()
     LoadLibraries("/primary/libraries")
     print()
     RunApp("/primary/app.lua")
